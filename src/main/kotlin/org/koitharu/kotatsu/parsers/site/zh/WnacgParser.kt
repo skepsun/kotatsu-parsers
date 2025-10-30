@@ -36,7 +36,7 @@ import kotlinx.coroutines.delay
 import kotlin.random.Random
 import org.jsoup.HttpStatusException
 
-@MangaSourceParser("WNACG", "紳士漫畫", "zh", type = ContentType.HENTAI)
+@MangaSourceParser("WNACG", "Wnacg", "zh", type = ContentType.HENTAI)
 internal class WnacgParser(context: MangaLoaderContext) :
     PagedMangaParser(context, MangaParserSource.WNACG, 30) {
 
