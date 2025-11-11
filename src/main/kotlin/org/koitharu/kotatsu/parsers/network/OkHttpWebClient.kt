@@ -110,24 +110,37 @@ public class OkHttpWebClient(
 		return this
 	}
 
-	private fun Response.ensureSuccess(): Response {
-		val exception: Exception? = when (code) { // Catch some error codes, not all
-			HttpURLConnection.HTTP_NOT_FOUND -> NotFoundException(message, request.url.toString())
-			HttpURLConnection.HTTP_UNAUTHORIZED -> request.tag(MangaSource::class.java)?.let {
-				AuthRequiredException(it)
-			} ?: HttpStatusException(message, code, request.url.toString())
+    private fun Response.ensureSuccess(): Response {
+        fun peekErrorBody(): String {
+            return runCatching {
+                val peek = peekBody(1024)
+                val bytes = peek.bytes()
+                val s = try {
+                    String(bytes, Charsets.UTF_8)
+                } catch (_: Exception) {
+                    bytes.joinToString(limit = 64, truncated = "…") { it.toUByte().toString() }
+                }
+                s
+            }.getOrDefault("")
+        }
 
-			in 400..599 -> HttpStatusException(message, code, request.url.toString())
-			else -> null
-		}
-		if (exception != null) {
-			runCatching {
-				close()
-			}.onFailure {
-				exception.addSuppressed(it)
-			}
-			throw exception
-		}
-		return this
-	}
+        val exception: Exception? = when (code) { // Catch some error codes, not all
+            HttpURLConnection.HTTP_NOT_FOUND -> NotFoundException(message, request.url.toString())
+            HttpURLConnection.HTTP_UNAUTHORIZED -> request.tag(MangaSource::class.java)?.let {
+                AuthRequiredException(it)
+            } ?: HttpStatusException(message, code, request.url.toString())
+
+            in 400..599 -> {
+                val bodyText = peekErrorBody()
+                val msg = if (bodyText.isNotBlank()) "${message}: ${bodyText}" else message
+                HttpStatusException(msg, code, request.url.toString())
+            }
+            else -> null
+        }
+        if (exception != null) {
+            runCatching { close() }.onFailure { exception.addSuppressed(it) }
+            throw exception
+        }
+        return this
+    }
 }

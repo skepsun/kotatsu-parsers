@@ -19,6 +19,9 @@
 .idea/**/dbnavigator.xml
 .idea/**/Project_Default.xml
 
+# macos DS_Store
+.DS_Store
+
 # Gradle
 .idea/**/gradle.xml
 .idea/**/libraries

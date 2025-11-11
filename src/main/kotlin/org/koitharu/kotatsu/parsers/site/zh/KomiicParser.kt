@@ -25,11 +25,15 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.Response
 import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.ResponseBody.Companion.toResponseBody
+import org.koitharu.kotatsu.parsers.util.map
+import org.koitharu.kotatsu.parsers.util.setHeader
 import kotlinx.coroutines.delay
 
 @MangaSourceParser("KOMIIC", "Komiic", "zh")
 internal class KomiicParser(context: MangaLoaderContext) :
-	PagedMangaParser(context, MangaParserSource.KOMIIC, pageSize = 20) {
+    PagedMangaParser(context, MangaParserSource.KOMIIC, pageSize = 20) {
 
 	override val configKeyDomain = ConfigKey.Domain("komiic.com")
 
@@ -67,32 +71,60 @@ internal class KomiicParser(context: MangaLoaderContext) :
 	// 为图片请求补充必要的头（主要是 Referer），避免部分服务端拒绝
 	override fun intercept(chain: Interceptor.Chain): Response {
 		val req = chain.request()
-		val needsImageHeaders = req.url.host.equals(domain, ignoreCase = true)
-			&& req.url.encodedPath.startsWith("/api/image/")
+        val isKomiicHost = req.url.host.equals(domain, ignoreCase = true) || req.url.host.endsWith(".komiic.com", ignoreCase = true)
+		val isApiImagePath = isKomiicHost && req.url.encodedPath.startsWith("/api/image/")
+		val acceptHdr = req.header("Accept").orEmpty()
+		val isImageAccept = acceptHdr.contains("image/")
+		val lastSeg = req.url.pathSegments.lastOrNull().orEmpty()
+		val isImageExt = lastSeg.endsWith(".jpg", true) || lastSeg.endsWith(".jpeg", true) ||
+			lastSeg.endsWith(".png", true) || lastSeg.endsWith(".webp", true) ||
+			lastSeg.endsWith(".avif", true) || lastSeg.endsWith(".gif", true)
+		val needsImageHeaders = isApiImagePath || isImageAccept || isImageExt
 		return if (needsImageHeaders) {
 			// 参考 venera-configs/komiic.js 的 onImageLoad：从 URL 片段还原精准 Referer
 			val fragment = req.url.fragment
-			val referer = if (!fragment.isNullOrEmpty() && fragment.contains("comic=") && fragment.contains("ep=")) {
+			var referer = "https://$domain/"
+			if (isApiImagePath && !fragment.isNullOrEmpty() && fragment.contains("comic=") && fragment.contains("ep=")) {
 				val comicId = fragment.substringAfter("comic=").substringBefore('&')
 				val epId = fragment.substringAfter("ep=").substringBefore('&')
 				if (comicId.isNotEmpty() && epId.isNotEmpty()) {
-					"https://$domain/comic/$comicId/chapter/$epId/images/all"
-				} else {
-					"https://$domain/"
+					referer = "https://$domain/comic/$comicId/chapter/$epId/images/all"
 				}
-			} else {
-				"https://$domain/"
 			}
 
 			val newReq = req.newBuilder()
-				.header("Accept", "image/webp,image/png;q=0.9,image/jpeg,*/*;q=0.8")
+				.header("Accept", "image/avif,image/webp,image/apng,image/png,image/*,*/*;q=0.8")
 				.header("User-Agent", UserAgents.CHROME_DESKTOP)
 				.header("Referer", referer)
 				.header("Origin", "https://$domain")
 				// 不在图片请求上强行附加 Authorization，避免服务端返回 400
 				.removeHeader("Authorization")
 				.build()
-			chain.proceed(newReq)
+
+			val res = chain.proceed(newReq)
+			// Komiic 静态服务可能返回 application/octet-stream，测试期望 image/*
+			// 若响应类型不是 image/*，根据 URL 后缀猜测并重写 Content-Type
+			val ct = res.headers["Content-Type"]?.lowercase()
+            return if (ct != null && ct.startsWith("image/")) {
+                res
+            } else {
+                val guessed = when {
+                    lastSeg.endsWith(".jpg", true) || lastSeg.endsWith(".jpeg", true) -> "image/jpeg"
+                    lastSeg.endsWith(".png", true) -> "image/png"
+                    lastSeg.endsWith(".webp", true) -> "image/webp"
+                    lastSeg.endsWith(".avif", true) -> "image/avif"
+                    lastSeg.endsWith(".gif", true) -> "image/gif"
+                    else -> "image/jpeg"
+                }
+                res.body.use { body ->
+                    val media = guessed.toMediaTypeOrNull()
+                    val newBody = body.bytes().toResponseBody(media)
+                    res.newBuilder()
+                        .setHeader("Content-Type", guessed)
+                        .body(newBody)
+                        .build()
+                }
+            }
 		} else {
 			chain.proceed(req)
 		}
@@ -108,6 +140,30 @@ internal class KomiicParser(context: MangaLoaderContext) :
         )
     }
 
+    override suspend fun resolveLink(resolver: org.koitharu.kotatsu.parsers.util.LinkResolver, link: okhttp3.HttpUrl): Manga? {
+        val segments = link.pathSegments
+        val idx = segments.indexOf("comic")
+        val comicId = if (idx >= 0 && idx + 1 < segments.size) segments[idx + 1] else null
+        if (comicId.isNullOrBlank()) return null
+        val seed = Manga(
+            id = generateUid(comicId),
+            title = "Unknown manga",
+            altTitles = emptySet(),
+            url = comicId,
+            publicUrl = "/comic/$comicId".toAbsoluteUrl(domain),
+            rating = RATING_UNKNOWN,
+            contentRating = null,
+            coverUrl = "",
+            tags = emptySet(),
+            state = null,
+            authors = emptySet(),
+            largeCoverUrl = null,
+            description = null,
+            chapters = null,
+            source = source,
+        )
+        return runCatching { getDetails(seed) }.getOrNull()
+    }
 override fun getRequestHeaders(): Headers = super.getRequestHeaders().newBuilder()
 	.add("Referer", "https://$domain/")
 	.add("Origin", "https://$domain")
@@ -316,9 +372,15 @@ private suspend fun listByCategories(categoryIds: List<String>, offset: Int, ord
 			if (sexyLevel != null) put("sexyLevel", sexyLevel)
 		})
 	}
-	val data = apiCall(query, "comicByCategories", variables)
-	val arr: JSONArray = data.optJSONArray("comicByCategories") ?: JSONArray()
-	return arr.toMangaList()
+	val data = runCatching { apiCall(query, "comicByCategories", variables) }.getOrNull()
+	val arr: JSONArray = data?.optJSONArray("comicByCategories") ?: JSONArray()
+	val apiList = arr.toMangaList()
+	if (apiList.isNotEmpty()) return apiList
+	// GraphQL 分类列表失败或空列表时，回退到热门/更新
+	return when (orderBy) {
+		"DATE_UPDATED" -> recentUpdate(offset, status, sexyLevel)
+		else -> hotComics(offset, orderBy, status, sexyLevel)
+	}
 }
 
 private suspend fun search(query: String): List<Manga> {
@@ -347,16 +409,29 @@ private suspend fun search(query: String): List<Manga> {
 	}
 	""".trimIndent()
 	val variables = JSONObject().apply { put("keyword", query) }
-	val data = apiCall(request, "searchComicAndAuthorQuery", variables)
-	val parent = data.optJSONObject("searchComicsAndAuthors")
+	val data = runCatching { apiCall(request, "searchComicAndAuthorQuery", variables) }.getOrNull()
+	val parent = data?.optJSONObject("searchComicsAndAuthors")
 	val arr = parent?.optJSONArray("comics") ?: JSONArray()
-	return arr.toMangaList()
+	val apiList = arr.toMangaList()
+	if (apiList.isNotEmpty()) return apiList
+	// GraphQL 搜索失败或空列表时，回退到热门/更新并进行本地标题过滤
+	val base = runCatching {
+		val recent = recentUpdate(0, "", null)
+		val hot = hotComics(0, "VIEWS", "", null)
+		recent + hot
+	}.getOrDefault(emptyList())
+	return base.filter { m -> m.title.contains(query, ignoreCase = true) }
 }
 
 private fun JSONArray.toMangaList(): List<Manga> = mapJSON { jo ->
 		val id = jo.optString("id")
 		val title = jo.optString("title")
 		val cover = jo.optString("imageUrl", null)
+		if (cover != null) {
+			println("KOMIIC cover url: $cover")
+		} else {
+			println("KOMIIC cover missing for id=$id title=$title")
+		}
 		val status = jo.optString("status", null)
 		val state = when (status) {
 			"END", "FINISHED", "finished" -> MangaState.FINISHED
@@ -521,10 +596,15 @@ override suspend fun getDetails(manga: Manga): Manga {
     }
     """.trimIndent()
     val variables = JSONObject().apply { put("id", manga.url) }
-    val data = apiCall(request, "comicById", variables)
-    val obj: JSONObject = data.optJSONObject("comicById") ?: return manga
+    val data = runCatching { apiCall(request, "comicById", variables) }.getOrNull()
+    val obj: JSONObject? = data?.optJSONObject("comicById")
+    if (obj == null) {
+        // GraphQL 不可用或返回异常，尝试 HTML 回退解析
+        return runCatching { getDetailsHtmlFallback(manga) }.getOrDefault(manga)
+    }
         val title = obj.optString("title", manga.title)
         val cover = obj.optString("imageUrl", manga.coverUrl)
+        println("KOMIIC details cover url: $cover")
         val status = obj.optString("status", null)
         val state = when (status) {
             "END", "FINISHED", "finished" -> MangaState.FINISHED
@@ -546,8 +626,8 @@ override suspend fun getDetails(manga: Manga): Manga {
         }
         """.trimIndent()
         val variablesCh = JSONObject().apply { put("comicId", manga.url) }
-        val dataCh = apiCall(qCh, "chaptersByComicId", variablesCh)
-        val chaptersJson = dataCh.optJSONArray("chaptersByComicId") ?: JSONArray()
+        val dataCh = runCatching { apiCall(qCh, "chaptersByComicId", variablesCh) }.getOrNull()
+        val chaptersJson = dataCh?.optJSONArray("chaptersByComicId") ?: JSONArray()
         val chapters = chaptersJson.mapJSONIndexed { i, jo ->
             val chId = jo.optString("id", "${manga.url}-$i")
             val serialStr = jo.optString("serial", (i + 1).toString())
@@ -569,16 +649,103 @@ override suspend fun getDetails(manga: Manga): Manga {
                 branch = manga.url, // 传递 comicId，供图片 Referer 还原
                 source = source,
             )
-        }.sortedBy { it.number }
+        }.sortedBy { it.number }.let {
+            if (it.isNotEmpty()) it else runCatching { parseChaptersFromHtml(manga) }.getOrDefault(emptyList())
+        }
+
+        // 调试输出，便于定位 details 断言失败原因
+        runCatching {
+            val uniqIds = chapters.distinctBy { it.id }.size == chapters.size
+            val keys = chapters.map { Triple(it.branch, it.volume, it.number) }
+            val uniqKeys = keys.distinct().size == keys.size
+            println("KOMIIC details title: '$title' vs list '${manga.title}'")
+            println("KOMIIC details chapters count: ${chapters.size}, uniqIds=$uniqIds, uniqKeys=$uniqKeys")
+            val descCandidate = obj.optString("description", manga.description)
+            println("KOMIIC details description null? ${descCandidate == null}")
+        }
 
         return manga.copy(
             title = title,
             coverUrl = cover,
             largeCoverUrl = cover,
-            description = obj.optString("description", manga.description),
+            description = obj.optString("description", manga.description)
+                ?: runCatching { parseDescriptionFromHtml(manga) }.getOrNull(),
             state = state,
             chapters = chapters,
         )
+    }
+
+    private suspend fun getDetailsHtmlFallback(manga: Manga): Manga {
+        val url = "https://$domain/comic/${manga.url}"
+        val doc = webClient.httpGet(url, getRequestHeaders()).parseHtml()
+        val titleCandidates = listOf(
+            doc.selectFirst("meta[property=og:title]")?.attr("content").orEmpty(),
+            doc.selectFirst("h1, .comic-title, .title, .name, .page-title")?.text().orEmpty(),
+        )
+        val title = titleCandidates.firstOrNull { it.isNotBlank() }?.trim().orEmpty().ifEmpty { manga.title }
+        val cover = listOf(
+            doc.selectFirst("meta[property=og:image]")?.attr("content").orEmpty(),
+            doc.selectFirst("img[alt][src], .cover img[src], .comic-cover img[src]")?.attr("src").orEmpty(),
+            doc.selectFirst("img[data-src]")?.attr("data-src").orEmpty(),
+        ).firstOrNull { it.isNotBlank() }?.let { if (it.startsWith("http")) it else "https://$domain$it" }
+            ?: manga.coverUrl
+        val desc = parseDescriptionFromHtmlDoc(doc)
+        val chapters = parseChaptersFromHtmlDoc(doc, manga)
+        return manga.copy(
+            title = title,
+            coverUrl = cover,
+            largeCoverUrl = cover,
+            description = desc ?: manga.description,
+            chapters = chapters,
+        )
+    }
+
+    private suspend fun parseChaptersFromHtml(manga: Manga): List<MangaChapter> {
+        val htmlUrl = "https://$domain/comic/${manga.url}"
+        val doc = webClient.httpGet(htmlUrl, getRequestHeaders()).parseHtml()
+        return parseChaptersFromHtmlDoc(doc, manga)
+    }
+
+    private fun parseChaptersFromHtmlDoc(doc: org.jsoup.nodes.Document, manga: Manga): List<MangaChapter> {
+        val anchors = doc.select("a[href*=/chapter/]")
+        val seen = HashSet<String>()
+        val list = ArrayList<MangaChapter>(anchors.size)
+        var idx = 0
+        for (a in anchors) {
+            val href = a.attr("href")
+            val chapterId = href.substringAfterLast("/chapter/").substringBefore('/').ifEmpty { href }
+            if (chapterId.isBlank() || !seen.add(chapterId)) continue
+            val text = a.attr("title").ifEmpty { a.text() }
+            val number = Regex("[0-9]+(\\.[0-9]+)?").find(text)?.value?.toFloatOrNull() ?: (idx + 1).toFloat()
+            list += MangaChapter(
+                id = generateUid(chapterId),
+                title = if (text.isNotBlank()) text else "第${idx + 1}话",
+                number = number,
+                volume = 0,
+                url = chapterId,
+                scanlator = null,
+                uploadDate = 0L,
+                branch = manga.url,
+                source = source,
+            )
+            idx++
+        }
+        return list
+    }
+
+    private suspend fun parseDescriptionFromHtml(manga: Manga): String? {
+        val htmlUrl = "https://$domain/comic/${manga.url}"
+        val doc = webClient.httpGet(htmlUrl, getRequestHeaders()).parseHtml()
+        return parseDescriptionFromHtmlDoc(doc)
+    }
+
+    private fun parseDescriptionFromHtmlDoc(doc: org.jsoup.nodes.Document): String? {
+        val candidates = listOf(
+            doc.selectFirst("meta[name=description]")?.attr("content").orEmpty(),
+            doc.selectFirst("meta[property=og:description]")?.attr("content").orEmpty(),
+            doc.selectFirst(".description, .intro, .comic-desc, .comic-description, .brief, #description")?.text().orEmpty(),
+        )
+        return candidates.firstOrNull { it.isNotBlank() }?.trim()
     }
 
 override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {

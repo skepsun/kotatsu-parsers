@@ -1,5 +1,14 @@
-# Kotatsu parsers
+Original repository: [kotatsu-parsers](https://github.com/KotatsuApp/kotatsu-parsers)
 
+Original chinese sites parsers from venera: [venera-configs](https://github.com/venera-app/venera-configs)
+
+## What about this repository?
+**Target**: Convert parsers from venera (with improved filters) to kotatsu
+**Done**: 
+- [x] Komiic
+- [ ] CopyManga
+
+# Original kotatsu-parsers README
 This library provides a collection of manga parsers for convenient access manga available on the web. It can be used in
 JVM and Android applications.
 
