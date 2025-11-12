@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
 /**
  * Annotate [MangaParser] implementation to mark this parser as broken instead of removing it

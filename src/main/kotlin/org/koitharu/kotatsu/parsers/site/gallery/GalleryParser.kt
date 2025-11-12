@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers.site.gallery
+package org.skepsun.kototoro.parsers.site.gallery
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.AbstractMangaParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.core.AbstractMangaParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.util.*
 import java.text.SimpleDateFormat
 import java.util.*
 

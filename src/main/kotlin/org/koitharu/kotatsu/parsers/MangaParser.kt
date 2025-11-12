@@ -1,16 +1,16 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
 import okhttp3.Headers
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.config.MangaSourceConfig
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.model.search.MangaSearchQuery
-import org.koitharu.kotatsu.parsers.model.search.MangaSearchQueryCapabilities
-import org.koitharu.kotatsu.parsers.util.LinkResolver
-import org.koitharu.kotatsu.parsers.util.convertToMangaSearchQuery
-import org.koitharu.kotatsu.parsers.util.toMangaListFilterCapabilities
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.config.MangaSourceConfig
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.model.search.MangaSearchQuery
+import org.skepsun.kototoro.parsers.model.search.MangaSearchQueryCapabilities
+import org.skepsun.kototoro.parsers.util.LinkResolver
+import org.skepsun.kototoro.parsers.util.convertToMangaSearchQuery
+import org.skepsun.kototoro.parsers.util.toMangaListFilterCapabilities
 import java.util.*
 
 public interface MangaParser : Interceptor {

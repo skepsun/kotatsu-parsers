@@ -1,17 +1,17 @@
-package org.koitharu.kotatsu.parsers.site.manga18.zh
+package org.skepsun.kototoro.parsers.site.manga18.zh
 
 import org.jsoup.nodes.Document
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.ContentType
-import org.koitharu.kotatsu.parsers.model.MangaChapter
-import org.koitharu.kotatsu.parsers.model.MangaListFilterOptions
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.manga18.Manga18Parser
-import org.koitharu.kotatsu.parsers.util.attrAsRelativeUrl
-import org.koitharu.kotatsu.parsers.util.generateUid
-import org.koitharu.kotatsu.parsers.util.mapChapters
-import org.koitharu.kotatsu.parsers.util.selectFirstOrThrow
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.ContentType
+import org.skepsun.kototoro.parsers.model.MangaChapter
+import org.skepsun.kototoro.parsers.model.MangaListFilterOptions
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.manga18.Manga18Parser
+import org.skepsun.kototoro.parsers.util.attrAsRelativeUrl
+import org.skepsun.kototoro.parsers.util.generateUid
+import org.skepsun.kototoro.parsers.util.mapChapters
+import org.skepsun.kototoro.parsers.util.selectFirstOrThrow
 
 @MangaSourceParser("HANMAN18", "Hanman18", "zh", ContentType.HENTAI)
 internal class Hanman18(context: MangaLoaderContext) :

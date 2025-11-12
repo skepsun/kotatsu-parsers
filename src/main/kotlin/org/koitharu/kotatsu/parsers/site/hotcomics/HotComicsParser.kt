@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.site.hotcomics
+package org.skepsun.kototoro.parsers.site.hotcomics
 
 import androidx.collection.ArrayMap
 import androidx.collection.ArraySet
@@ -6,12 +6,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okhttp3.Headers
 import org.jsoup.nodes.Document
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.PagedMangaParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.network.UserAgents
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.network.UserAgents
+import org.skepsun.kototoro.parsers.util.*
 import java.text.SimpleDateFormat
 import java.util.*
 

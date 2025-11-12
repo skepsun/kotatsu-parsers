@@ -1,14 +1,14 @@
-package org.koitharu.kotatsu.parsers.site.galleryadults.all
+package org.skepsun.kototoro.parsers.site.galleryadults.all
 
 import org.jsoup.nodes.Element
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.ContentType
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.MangaTag
-import org.koitharu.kotatsu.parsers.site.galleryadults.GalleryAdultsParser
-import org.koitharu.kotatsu.parsers.util.mapToSet
-import org.koitharu.kotatsu.parsers.util.removeSuffix
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.ContentType
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.MangaTag
+import org.skepsun.kototoro.parsers.site.galleryadults.GalleryAdultsParser
+import org.skepsun.kototoro.parsers.util.mapToSet
+import org.skepsun.kototoro.parsers.util.removeSuffix
 import java.util.*
 
 @MangaSourceParser("ASMHENTAI", "AsmHentai", type = ContentType.HENTAI)

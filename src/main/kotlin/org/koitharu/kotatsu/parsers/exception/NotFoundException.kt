@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.exception
+package org.skepsun.kototoro.parsers.exception
 
 import org.jsoup.HttpStatusException
 import java.net.HttpURLConnection

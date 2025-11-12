@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.site.galleryadults.zh
+package org.skepsun.kototoro.parsers.site.galleryadults.zh
 
 import kotlinx.coroutines.test.runTest
 import okhttp3.Headers
@@ -6,16 +6,16 @@ import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import kotlin.time.Duration.Companion.minutes
-import org.koitharu.kotatsu.parsers.CommonHeadersInterceptor
-import org.koitharu.kotatsu.parsers.InMemoryCookieJar
-import org.koitharu.kotatsu.parsers.MangaLoaderContextMock
-import org.koitharu.kotatsu.parsers.model.MangaChapter
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.MangaPage
-import org.koitharu.kotatsu.parsers.network.OkHttpWebClient
-import org.koitharu.kotatsu.parsers.util.parseRaw
-import org.koitharu.kotatsu.parsers.util.parseHtml
-import org.koitharu.kotatsu.parsers.util.toAbsoluteUrl
+import org.skepsun.kototoro.parsers.CommonHeadersInterceptor
+import org.skepsun.kototoro.parsers.InMemoryCookieJar
+import org.skepsun.kototoro.parsers.MangaLoaderContextMock
+import org.skepsun.kototoro.parsers.model.MangaChapter
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.MangaPage
+import org.skepsun.kototoro.parsers.network.OkHttpWebClient
+import org.skepsun.kototoro.parsers.util.parseRaw
+import org.skepsun.kototoro.parsers.util.parseHtml
+import org.skepsun.kototoro.parsers.util.toAbsoluteUrl
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.concurrent.TimeUnit
@@ -41,13 +41,13 @@ class WnacgReadFlowTest {
         val parser = context.newParserInstance(MangaParserSource.WNACG)
         val domain = parser.domain
         val aid = "327407"
-        val seed = org.koitharu.kotatsu.parsers.model.Manga(
+        val seed = org.skepsun.kototoro.parsers.model.Manga(
             id = aid.hashCode().toLong(),
             title = "aid-$aid",
             altTitles = emptySet(),
             url = "/photos-index-aid-$aid.html",
             publicUrl = "https://$domain/photos-index-aid-$aid.html",
-            rating = org.koitharu.kotatsu.parsers.model.RATING_UNKNOWN,
+            rating = org.skepsun.kototoro.parsers.model.RATING_UNKNOWN,
             contentRating = null,
             coverUrl = null,
             tags = emptySet(),

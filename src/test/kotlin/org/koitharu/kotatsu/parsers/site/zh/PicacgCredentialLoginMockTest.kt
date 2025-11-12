@@ -1,16 +1,16 @@
-package org.koitharu.kotatsu.parsers.site.zh
+package org.skepsun.kototoro.parsers.site.zh
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import kotlin.time.Duration.Companion.minutes
-import org.koitharu.kotatsu.parsers.MangaLoaderContextMock
-import org.koitharu.kotatsu.parsers.MangaParserAuthProvider
-import org.koitharu.kotatsu.parsers.MangaParserCredentialsAuthProvider
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.util.insertCookies
-import org.koitharu.kotatsu.parsers.util.getCookies
+import org.skepsun.kototoro.parsers.MangaLoaderContextMock
+import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.MangaParserCredentialsAuthProvider
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.util.insertCookies
+import org.skepsun.kototoro.parsers.util.getCookies
 
 /**
  * Picacg 凭证登录（Mock 上下文）
@@ -19,7 +19,7 @@ import org.koitharu.kotatsu.parsers.util.getCookies
  * - 登录后检查授权状态与可读取用户名
  *
  * 运行方法示例：
- * PICACG_SKIP_TOKEN_FILE=1 PICACG_UUID=defaultUuid PICACG_EMAIL="your_email" PICACG_PASSWORD="your_password" ./gradlew :kotatsu-parsers:test --tests "org.koitharu.kotatsu.parsers.site.zh.PicacgCredentialLoginMockTest.login_with_credentials_on_mock_context" --rerun-tasks --no-parallel --console=plain
+ * PICACG_SKIP_TOKEN_FILE=1 PICACG_UUID=defaultUuid PICACG_EMAIL="your_email" PICACG_PASSWORD="your_password" ./gradlew :kototoro-parsers:test --tests "org.skepsun.kototoro.parsers.site.zh.PicacgCredentialLoginMockTest.login_with_credentials_on_mock_context" --rerun-tasks --no-parallel --console=plain
  */
 class PicacgCredentialLoginMockTest {
 
@@ -30,7 +30,7 @@ class PicacgCredentialLoginMockTest {
         val parser = context.newParserInstance(MangaParserSource.PICACG)
         // 显式设置 domain 为 api.go2778.com 以匹配 Python 脚本，避免官方服务器限流
         // 通过配置系统设置域名，而不是直接赋值 parser.domain
-        val config = context.getConfig(MangaParserSource.PICACG) as org.koitharu.kotatsu.parsers.SourceConfigMock
+        val config = context.getConfig(MangaParserSource.PICACG) as org.skepsun.kototoro.parsers.SourceConfigMock
         config.set(parser.configKeyDomain, "api.go2778.com")
         val domain = parser.domain
         println("[TEST] PicacgParser domain=$domain")

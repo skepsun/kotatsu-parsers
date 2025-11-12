@@ -15,5 +15,5 @@ dependencyResolutionManagement {
 }
 
 
-rootProject.name = "kotatsu-parsers"
-include("kotatsu-parsers-ksp")
+rootProject.name = "kototoro-parsers"
+include("kototoro-parsers-ksp")

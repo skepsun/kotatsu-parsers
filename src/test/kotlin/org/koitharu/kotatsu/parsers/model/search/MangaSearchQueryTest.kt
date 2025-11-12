@@ -1,13 +1,13 @@
-package org.koitharu.kotatsu.parsers.model.search
+package org.skepsun.kototoro.parsers.model.search
 
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.MangaState
-import org.koitharu.kotatsu.parsers.model.MangaTag
-import org.koitharu.kotatsu.parsers.model.search.QueryCriteria.*
-import org.koitharu.kotatsu.parsers.model.search.SearchableField.*
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.MangaState
+import org.skepsun.kototoro.parsers.model.MangaTag
+import org.skepsun.kototoro.parsers.model.search.QueryCriteria.*
+import org.skepsun.kototoro.parsers.model.search.SearchableField.*
 import java.util.*
 
 class MangaSearchQueryCapabilitiesTest {

@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.model
+package org.skepsun.kototoro.parsers.model
 
 import okhttp3.HttpUrl.Companion.toHttpUrl
 

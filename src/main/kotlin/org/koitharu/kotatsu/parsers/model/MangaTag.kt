@@ -1,6 +1,6 @@
-package org.koitharu.kotatsu.parsers.model
+package org.skepsun.kototoro.parsers.model
 
-import org.koitharu.kotatsu.parsers.MangaParser
+import org.skepsun.kototoro.parsers.MangaParser
 
 public data class MangaTag(
 	/**

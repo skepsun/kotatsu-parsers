@@ -1,20 +1,20 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
 import kotlinx.coroutines.test.runTest
 import okhttp3.HttpUrl
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.params.ParameterizedTest
-import org.koitharu.kotatsu.parsers.core.PagedMangaParser
-import org.koitharu.kotatsu.parsers.core.SinglePageMangaParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.model.search.MangaSearchQuery
-import org.koitharu.kotatsu.parsers.model.search.QueryCriteria
-import org.koitharu.kotatsu.parsers.model.search.QueryCriteria.Include
-import org.koitharu.kotatsu.parsers.model.search.SearchableField.*
-import org.koitharu.kotatsu.parsers.util.medianOrNull
-import org.koitharu.kotatsu.parsers.util.mimeType
-import org.koitharu.kotatsu.test_util.*
+import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.core.SinglePageMangaParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.model.search.MangaSearchQuery
+import org.skepsun.kototoro.parsers.model.search.QueryCriteria
+import org.skepsun.kototoro.parsers.model.search.QueryCriteria.Include
+import org.skepsun.kototoro.parsers.model.search.SearchableField.*
+import org.skepsun.kototoro.parsers.util.medianOrNull
+import org.skepsun.kototoro.parsers.util.mimeType
+import org.skepsun.kototoro.test_util.*
 import kotlin.time.Duration.Companion.minutes
 
 //@ExtendWith(AuthCheckExtension::class)

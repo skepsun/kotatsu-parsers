@@ -1,12 +1,12 @@
-package org.koitharu.kotatsu.test_util
+package org.skepsun.kototoro.test_util
 
 import androidx.collection.ArraySet
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import org.koitharu.kotatsu.parsers.model.Manga
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.RATING_UNKNOWN
-import org.koitharu.kotatsu.parsers.util.LONG_HASH_SEED
-import org.koitharu.kotatsu.parsers.util.toRelativeUrl
+import org.skepsun.kototoro.parsers.model.Manga
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.RATING_UNKNOWN
+import org.skepsun.kototoro.parsers.util.LONG_HASH_SEED
+import org.skepsun.kototoro.parsers.util.toRelativeUrl
 
 private val PATTERN_URL_ABSOLUTE = Regex("^https?://[\\s\\S]+", setOf(RegexOption.IGNORE_CASE))
 private val PATTERN_URL_RELATIVE = Regex("^/[\\s\\S]+", setOf(RegexOption.IGNORE_CASE))

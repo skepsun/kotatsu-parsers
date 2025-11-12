@@ -1,11 +1,11 @@
-package org.koitharu.kotatsu.parsers.site.vmp
+package org.skepsun.kototoro.parsers.site.vmp
 
 import kotlinx.coroutines.coroutineScope
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.PagedMangaParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.util.*
 import java.util.*
 
 internal abstract class VmpParser(

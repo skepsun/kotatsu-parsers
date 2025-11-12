@@ -1,8 +1,8 @@
-package org.koitharu.kotatsu.parsers.site.ru.rulib
+package org.skepsun.kototoro.parsers.site.ru.rulib
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaParserSource
 
 @MangaSourceParser("YAOILIB", "SlashLib", "ru")
 internal class SlashLibParser(context: MangaLoaderContext) : LibSocialParser(

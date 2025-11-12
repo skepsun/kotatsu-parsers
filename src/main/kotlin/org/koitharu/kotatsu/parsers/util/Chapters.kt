@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
 import org.json.JSONArray
 import org.json.JSONObject
-import org.koitharu.kotatsu.parsers.InternalParsersApi
-import org.koitharu.kotatsu.parsers.model.MangaChapter
-import org.koitharu.kotatsu.parsers.util.json.asTypedList
+import org.skepsun.kototoro.parsers.InternalParsersApi
+import org.skepsun.kototoro.parsers.model.MangaChapter
+import org.skepsun.kototoro.parsers.util.json.asTypedList
 
 @InternalParsersApi
 public inline fun <T> List<T>.mapChapters(

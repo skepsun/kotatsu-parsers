@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
 import androidx.collection.SparseArrayCompat
 import androidx.collection.set

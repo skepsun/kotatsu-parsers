@@ -1,13 +1,13 @@
-package org.koitharu.kotatsu.parsers.site.fmreader.ja
+package org.skepsun.kototoro.parsers.site.fmreader.ja
 
 import org.jsoup.nodes.Document
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaChapter
-import org.koitharu.kotatsu.parsers.model.MangaPage
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.fmreader.FmreaderParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaChapter
+import org.skepsun.kototoro.parsers.model.MangaPage
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.fmreader.FmreaderParser
+import org.skepsun.kototoro.parsers.util.*
 import java.text.SimpleDateFormat
 
 @MangaSourceParser("WELOVEMANGA", "WeLoveManga", "ja")

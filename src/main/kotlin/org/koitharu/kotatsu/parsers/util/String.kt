@@ -1,6 +1,6 @@
 @file:JvmName("StringUtils")
 
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
 import androidx.collection.MutableIntList
 import java.math.BigInteger

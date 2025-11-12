@@ -1,13 +1,13 @@
-package org.koitharu.kotatsu.parsers.site.galleryadults.all
+package org.skepsun.kototoro.parsers.site.galleryadults.all
 
 import org.jsoup.internal.StringUtil
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.galleryadults.GalleryAdultsParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.galleryadults.GalleryAdultsParser
+import org.skepsun.kototoro.parsers.util.*
 import java.util.*
 
 @MangaSourceParser("NHENTAI", "NHentai.net", type = ContentType.HENTAI)

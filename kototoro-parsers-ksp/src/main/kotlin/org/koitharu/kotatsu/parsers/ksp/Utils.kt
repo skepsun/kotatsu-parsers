@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.ksp
+package org.skepsun.kototoro.parsers.ksp
 
 import java.util.*
 

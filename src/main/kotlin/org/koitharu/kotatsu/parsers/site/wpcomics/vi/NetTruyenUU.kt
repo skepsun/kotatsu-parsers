@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.site.wpcomics.vi
+package org.skepsun.kototoro.parsers.site.wpcomics.vi
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -6,12 +6,12 @@ import kotlinx.coroutines.coroutineScope
 import org.jsoup.nodes.Element
 import androidx.collection.ArrayMap
 import kotlinx.coroutines.sync.withLock
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.exception.NotFoundException
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.wpcomics.WpComicsParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.exception.NotFoundException
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.wpcomics.WpComicsParser
+import org.skepsun.kototoro.parsers.util.*
 import java.util.*
 
 @MangaSourceParser("NETTRUYENUU", "NetTruyenUU", "vi")

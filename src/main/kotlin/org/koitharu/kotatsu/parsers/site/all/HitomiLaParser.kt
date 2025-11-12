@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.site.all
+package org.skepsun.kototoro.parsers.site.all
 
 import androidx.collection.ArraySet
 import kotlinx.coroutines.async
@@ -10,15 +10,15 @@ import okhttp3.Headers
 import org.json.JSONArray
 import org.json.JSONObject
 import org.jsoup.Jsoup
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.AbstractMangaParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.util.*
-import org.koitharu.kotatsu.parsers.util.json.getStringOrNull
-import org.koitharu.kotatsu.parsers.util.json.mapJSON
-import org.koitharu.kotatsu.parsers.util.suspendlazy.suspendLazy
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.core.AbstractMangaParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.util.*
+import org.skepsun.kototoro.parsers.util.json.getStringOrNull
+import org.skepsun.kototoro.parsers.util.json.mapJSON
+import org.skepsun.kototoro.parsers.util.suspendlazy.suspendLazy
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest

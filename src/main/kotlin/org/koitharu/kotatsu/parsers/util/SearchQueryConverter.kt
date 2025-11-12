@@ -1,15 +1,15 @@
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
-import org.koitharu.kotatsu.parsers.model.MangaListFilter
-import org.koitharu.kotatsu.parsers.model.MangaListFilterCapabilities
-import org.koitharu.kotatsu.parsers.model.SortOrder
-import org.koitharu.kotatsu.parsers.model.YEAR_UNKNOWN
-import org.koitharu.kotatsu.parsers.model.search.MangaSearchQuery
-import org.koitharu.kotatsu.parsers.model.search.MangaSearchQueryCapabilities
-import org.koitharu.kotatsu.parsers.model.search.QueryCriteria
-import org.koitharu.kotatsu.parsers.model.search.QueryCriteria.*
-import org.koitharu.kotatsu.parsers.model.search.SearchCapability
-import org.koitharu.kotatsu.parsers.model.search.SearchableField.*
+import org.skepsun.kototoro.parsers.model.MangaListFilter
+import org.skepsun.kototoro.parsers.model.MangaListFilterCapabilities
+import org.skepsun.kototoro.parsers.model.SortOrder
+import org.skepsun.kototoro.parsers.model.YEAR_UNKNOWN
+import org.skepsun.kototoro.parsers.model.search.MangaSearchQuery
+import org.skepsun.kototoro.parsers.model.search.MangaSearchQueryCapabilities
+import org.skepsun.kototoro.parsers.model.search.QueryCriteria
+import org.skepsun.kototoro.parsers.model.search.QueryCriteria.*
+import org.skepsun.kototoro.parsers.model.search.SearchCapability
+import org.skepsun.kototoro.parsers.model.search.SearchableField.*
 
 /**
  * Converts a [MangaListFilter] into a [MangaSearchQuery].

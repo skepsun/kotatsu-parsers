@@ -1,9 +1,9 @@
-package org.koitharu.kotatsu.parsers.site.animebootstrap.id
+package org.skepsun.kototoro.parsers.site.animebootstrap.id
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.animebootstrap.AnimeBootstrapParser
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.animebootstrap.AnimeBootstrapParser
 
 @MangaSourceParser("SEKTEKOMIK", "SekteKomik", "id")
 internal class SekteKomik(context: MangaLoaderContext) :

@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.site.fr
+package org.skepsun.kototoro.parsers.site.fr
 
 import kotlinx.coroutines.*
 import okhttp3.Headers
@@ -8,16 +8,16 @@ import org.json.JSONArray
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.PagedMangaParser
-import org.koitharu.kotatsu.parsers.exception.ParseException
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.util.*
-import org.koitharu.kotatsu.parsers.util.json.getIntOrDefault
-import org.koitharu.kotatsu.parsers.util.json.getStringOrNull
-import org.koitharu.kotatsu.parsers.util.json.mapJSON
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.exception.ParseException
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.util.*
+import org.skepsun.kototoro.parsers.util.json.getIntOrDefault
+import org.skepsun.kototoro.parsers.util.json.getStringOrNull
+import org.skepsun.kototoro.parsers.util.json.mapJSON
 import java.text.SimpleDateFormat
 import java.util.*
 

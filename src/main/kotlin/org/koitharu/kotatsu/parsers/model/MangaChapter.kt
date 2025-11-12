@@ -1,7 +1,7 @@
-package org.koitharu.kotatsu.parsers.model
+package org.skepsun.kototoro.parsers.model
 
-import org.koitharu.kotatsu.parsers.util.formatSimple
-import org.koitharu.kotatsu.parsers.util.ifNullOrEmpty
+import org.skepsun.kototoro.parsers.util.formatSimple
+import org.skepsun.kototoro.parsers.util.ifNullOrEmpty
 
 public data class MangaChapter(
 	/**

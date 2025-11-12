@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers.site.madara.th
+package org.skepsun.kototoro.parsers.site.madara.th
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.madara.MadaraParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.madara.MadaraParser
+import org.skepsun.kototoro.parsers.util.*
 import java.util.Locale
 
 @MangaSourceParser("MANHWABREAKUP", "ManhwaBreakup", "th")

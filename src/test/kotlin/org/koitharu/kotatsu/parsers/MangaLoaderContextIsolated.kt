@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
 import com.koushikdutta.quack.QuackContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -6,15 +6,15 @@ import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
-import org.koitharu.kotatsu.parsers.bitmap.Bitmap
-import org.koitharu.kotatsu.parsers.config.MangaSourceConfig
-import org.koitharu.kotatsu.parsers.model.MangaSource
-import org.koitharu.kotatsu.parsers.network.NoCookiesCookieJar
-import org.koitharu.kotatsu.parsers.InMemoryCookieJar
-import org.koitharu.kotatsu.parsers.network.UserAgents
-import org.koitharu.kotatsu.parsers.util.await
-import org.koitharu.kotatsu.parsers.util.requireBody
-import org.koitharu.kotatsu.test_util.BitmapTestImpl
+import org.skepsun.kototoro.parsers.bitmap.Bitmap
+import org.skepsun.kototoro.parsers.config.MangaSourceConfig
+import org.skepsun.kototoro.parsers.model.MangaSource
+import org.skepsun.kototoro.parsers.network.NoCookiesCookieJar
+import org.skepsun.kototoro.parsers.InMemoryCookieJar
+import org.skepsun.kototoro.parsers.network.UserAgents
+import org.skepsun.kototoro.parsers.util.await
+import org.skepsun.kototoro.parsers.util.requireBody
+import org.skepsun.kototoro.test_util.BitmapTestImpl
 import java.awt.image.BufferedImage
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -68,9 +68,9 @@ internal object MangaLoaderContextIsolated : MangaLoaderContext() {
         return BitmapTestImpl(BufferedImage(width, height, BufferedImage.TYPE_INT_RGB))
     }
 
-    suspend fun doRequest(url: String, source: org.koitharu.kotatsu.parsers.model.MangaSource?): okhttp3.Response {
+    suspend fun doRequest(url: String, source: org.skepsun.kototoro.parsers.model.MangaSource?): okhttp3.Response {
         val request = okhttp3.Request.Builder().get().url(url)
-        if (source != null) request.tag(org.koitharu.kotatsu.parsers.model.MangaSource::class.java, source)
+        if (source != null) request.tag(org.skepsun.kototoro.parsers.model.MangaSource::class.java, source)
         return httpClient.newCall(request.build()).await()
     }
 

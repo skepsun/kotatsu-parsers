@@ -1,17 +1,17 @@
-package org.koitharu.kotatsu.parsers.site.nepnep
+package org.skepsun.kototoro.parsers.site.nepnep
 
 import org.json.JSONArray
 import org.json.JSONObject
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.AbstractMangaParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.network.UserAgents
-import org.koitharu.kotatsu.parsers.util.*
-import org.koitharu.kotatsu.parsers.util.json.asTypedList
-import org.koitharu.kotatsu.parsers.util.json.getStringOrNull
-import org.koitharu.kotatsu.parsers.util.json.mapJSONIndexed
-import org.koitharu.kotatsu.parsers.util.suspendlazy.suspendLazy
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.core.AbstractMangaParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.network.UserAgents
+import org.skepsun.kototoro.parsers.util.*
+import org.skepsun.kototoro.parsers.util.json.asTypedList
+import org.skepsun.kototoro.parsers.util.json.getStringOrNull
+import org.skepsun.kototoro.parsers.util.json.mapJSONIndexed
+import org.skepsun.kototoro.parsers.util.suspendlazy.suspendLazy
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -294,7 +294,7 @@ internal abstract class NepnepParser(
 			.substringAfter("vm.CurPathName = \"", "")
 			.substringBefore('"')
 		check(host.isNotEmpty()) {
-			"Manga4Life is overloaded and blocking Kotatsu right now. Wait for unblock."
+			"Manga4Life is overloaded and blocking Kototoro right now. Wait for unblock."
 		}
 		val titleURI = script.substringAfter("vm.IndexName = \"").substringBefore("\"")
 		val seasonURI = curChapter.getString("Directory")!!.let { if (it.isEmpty()) "" else "$it/" }

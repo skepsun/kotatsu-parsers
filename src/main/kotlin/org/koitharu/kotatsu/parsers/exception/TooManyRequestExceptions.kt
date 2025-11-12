@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.exception
+package org.skepsun.kototoro.parsers.exception
 
 import okio.IOException
 import java.time.Instant

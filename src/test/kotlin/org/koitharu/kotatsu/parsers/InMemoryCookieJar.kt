@@ -1,12 +1,12 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
-import org.koitharu.kotatsu.parsers.util.insertCookie
-import org.koitharu.kotatsu.parsers.util.splitByWhitespace
-import org.koitharu.kotatsu.test_util.component6
-import org.koitharu.kotatsu.test_util.component7
+import org.skepsun.kototoro.parsers.util.insertCookie
+import org.skepsun.kototoro.parsers.util.splitByWhitespace
+import org.skepsun.kototoro.test_util.component6
+import org.skepsun.kototoro.test_util.component7
 import java.io.InputStream
 import java.util.*
 import java.util.concurrent.TimeUnit

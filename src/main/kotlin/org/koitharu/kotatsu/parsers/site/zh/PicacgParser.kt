@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.site.zh
+package org.skepsun.kototoro.parsers.site.zh
 
 import androidx.collection.ArrayMap
 import kotlinx.coroutines.coroutineScope
@@ -12,38 +12,38 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.json.JSONArray
 import org.json.JSONObject
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-// import org.koitharu.kotatsu.parsers.Broken
-import org.koitharu.kotatsu.parsers.MangaParserAuthProvider
-import org.koitharu.kotatsu.parsers.MangaParserCredentialsAuthProvider
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.PagedMangaParser
-import org.koitharu.kotatsu.parsers.exception.AuthRequiredException
-import org.koitharu.kotatsu.parsers.exception.ParseException
-import org.koitharu.kotatsu.parsers.model.ContentType
-import org.koitharu.kotatsu.parsers.model.Manga
-import org.koitharu.kotatsu.parsers.model.MangaChapter
-import org.koitharu.kotatsu.parsers.model.MangaListFilter
-import org.koitharu.kotatsu.parsers.model.MangaListFilterCapabilities
-import org.koitharu.kotatsu.parsers.model.MangaListFilterOptions
-import org.koitharu.kotatsu.parsers.model.MangaPage
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.MangaTag
-import org.koitharu.kotatsu.parsers.model.RATING_UNKNOWN
-import org.koitharu.kotatsu.parsers.model.SortOrder
-import org.koitharu.kotatsu.parsers.network.UserAgents
-import org.koitharu.kotatsu.parsers.util.generateUid
-import org.koitharu.kotatsu.parsers.util.getCookies
-import org.koitharu.kotatsu.parsers.util.insertCookies
-import org.koitharu.kotatsu.parsers.util.map
-import org.koitharu.kotatsu.parsers.util.mapNotNullToSet
-import org.koitharu.kotatsu.parsers.util.parseJson
-import org.koitharu.kotatsu.parsers.util.parseJsonArray
-import org.koitharu.kotatsu.parsers.util.parseRaw
-import org.koitharu.kotatsu.parsers.util.setHeader
-import org.koitharu.kotatsu.parsers.util.attrOrNull
-import org.koitharu.kotatsu.parsers.util.oneOrThrowIfMany
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+// import org.skepsun.kototoro.parsers.Broken
+import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.MangaParserCredentialsAuthProvider
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.exception.AuthRequiredException
+import org.skepsun.kototoro.parsers.exception.ParseException
+import org.skepsun.kototoro.parsers.model.ContentType
+import org.skepsun.kototoro.parsers.model.Manga
+import org.skepsun.kototoro.parsers.model.MangaChapter
+import org.skepsun.kototoro.parsers.model.MangaListFilter
+import org.skepsun.kototoro.parsers.model.MangaListFilterCapabilities
+import org.skepsun.kototoro.parsers.model.MangaListFilterOptions
+import org.skepsun.kototoro.parsers.model.MangaPage
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.MangaTag
+import org.skepsun.kototoro.parsers.model.RATING_UNKNOWN
+import org.skepsun.kototoro.parsers.model.SortOrder
+import org.skepsun.kototoro.parsers.network.UserAgents
+import org.skepsun.kototoro.parsers.util.generateUid
+import org.skepsun.kototoro.parsers.util.getCookies
+import org.skepsun.kototoro.parsers.util.insertCookies
+import org.skepsun.kototoro.parsers.util.map
+import org.skepsun.kototoro.parsers.util.mapNotNullToSet
+import org.skepsun.kototoro.parsers.util.parseJson
+import org.skepsun.kototoro.parsers.util.parseJsonArray
+import org.skepsun.kototoro.parsers.util.parseRaw
+import org.skepsun.kototoro.parsers.util.setHeader
+import org.skepsun.kototoro.parsers.util.attrOrNull
+import org.skepsun.kototoro.parsers.util.oneOrThrowIfMany
 import java.util.Locale
 import java.util.EnumSet
 import javax.crypto.Mac
@@ -421,11 +421,11 @@ internal class PicacgParser(context: MangaLoaderContext) :
             if (status !in 200..299) {
                 // 尝试解析 message
                 val msg = runCatching { org.json.JSONObject(bodyText).optString("message").orEmpty() }.getOrDefault("")
-                if (status == 401) throw org.koitharu.kotatsu.parsers.exception.ParseException("Wrong password", baseUrl)
-                throw org.koitharu.kotatsu.parsers.exception.ParseException(msg.ifBlank { "Login failed ($status)" }, baseUrl)
+                if (status == 401) throw org.skepsun.kototoro.parsers.exception.ParseException("Wrong password", baseUrl)
+                throw org.skepsun.kototoro.parsers.exception.ParseException(msg.ifBlank { "Login failed ($status)" }, baseUrl)
             }
             val json = runCatching { org.json.JSONObject(bodyText) }.getOrElse {
-                throw org.koitharu.kotatsu.parsers.exception.ParseException("Login response not JSON", baseUrl)
+                throw org.skepsun.kototoro.parsers.exception.ParseException("Login response not JSON", baseUrl)
             }
             var token = json.optJSONObject("data")?.optString("token").orEmpty()
             if (token.isBlank()) {
@@ -441,9 +441,9 @@ internal class PicacgParser(context: MangaLoaderContext) :
                 val msgLower = msg.lowercase(java.util.Locale.ROOT)
                 val errLower = err.lowercase(java.util.Locale.ROOT)
                 if (code == 401 || msgLower.contains("password") || errLower.contains("password")) {
-                    throw org.koitharu.kotatsu.parsers.exception.ParseException("Wrong password", baseUrl)
+                    throw org.skepsun.kototoro.parsers.exception.ParseException("Wrong password", baseUrl)
                 }
-                throw org.koitharu.kotatsu.parsers.exception.ParseException(msg.ifBlank { "Login failed without token" }, baseUrl)
+                throw org.skepsun.kototoro.parsers.exception.ParseException(msg.ifBlank { "Login failed without token" }, baseUrl)
             }
             authTokenMemory = token
             context.cookieJar.insertCookies(domain, "authorization=$token")
@@ -584,8 +584,8 @@ internal class PicacgParser(context: MangaLoaderContext) :
     private fun sortParam(order: SortOrder): String = when (order) {
         SortOrder.NEWEST, SortOrder.RELEVANCE, SortOrder.ADDED, SortOrder.UPDATED -> "dd"
         SortOrder.NEWEST_ASC, SortOrder.ADDED_ASC, SortOrder.UPDATED_ASC -> "da"
-        SortOrder.POPULARITY, SortOrder.POPULARITY_ASC -> "ld"
-        SortOrder.RATING, SortOrder.RATING_ASC -> "vd"
+        SortOrder.POPULARITY -> "ld"
+        SortOrder.RATING -> "vd"
         else -> "dd"
     }
 
@@ -596,48 +596,57 @@ internal class PicacgParser(context: MangaLoaderContext) :
         else -> null
     }
 
-    // ===== Static categories (Picacg category page in JS) =====
+    // ===== Static categories (Picacg category page in JS) - Updated based on availability test =====
     private val staticCategories: List<String> = listOf(
-        "大家都在看",
-        "大濕推薦",
-        "那年今天",
-        "官方都在看",
-        "嗶咔漢化",
-        "全彩",
-        "長篇",
-        "同人",
-        "短篇",
-        "圓神領域",
-        "碧藍幻想",
-        "CG雜圖",
-        "英語 ENG",
-        "生肉",
-        "純愛",
-        "百合花園",
-        "耽美花園",
-        "偽娘哲學",
-        "後宮閃光",
-        "扶他樂園",
-        "單行本",
-        "姐姐系",
-        "妹妹系",
-        "SM",
-        "性轉換",
-        "足の恋",
-        "人妻",
-        "NTR",
-        "強暴",
-        "非人類",
-        "艦隊收藏",
-        "Love Live",
-        "SAO 刀劍神域",
-        "Fate",
-        "東方",
-        "WEBTOON",
-        "禁書目錄",
-        "歐美",
-        "Cosplay",
-        "重口地帶",
+        // High availability categories (10k+ comics)
+        "短篇",      // 98,758 comics
+        "同人",      // 67,079 comics
+        "全彩",      // 30,308 comics
+        "生肉",      // 26,995 comics
+        "長篇",      // 24,311 comics
+        "純愛",      // 20,489 comics
+        
+        // Medium availability categories (5k-10k comics)
+        "CG雜圖",    // 17,620 comics
+        "非人類",    // 13,306 comics
+        "耽美花園",  // 12,699 comics
+        "強暴",      // 10,108 comics
+        "Cosplay",   // 8,326 comics
+        "NTR",       // 7,778 comics
+        "人妻",      // 6,961 comics
+        "Fate",      // 6,744 comics
+        "妹妹系",    // 6,448 comics
+        "姐姐系",    // 5,782 comics
+        "單行本",    // 5,307 comics
+        "後宮閃光",  // 5,192 comics
+        "百合花園",  // 5,059 comics
+        "艦隊收藏",  // 4,966 comics
+        "扶他樂園",  // 4,893 comics
+        "重口地帶",  // 4,648 comics
+        "禁書目錄",  // 4,259 comics
+        "偽娘哲學",  // 4,184 comics
+        "英語 ENG",  // 3,973 comics
+        "SM",        // 3,813 comics
+        
+        // Low availability categories (1k-3k comics)
+        "東方",      // 3,449 comics
+        "性轉換",    // 1,638 comics
+        "足の恋",    // 1,466 comics
+        "Love Live", // 1,463 comics
+        "碧藍幻想",  // 1,124 comics
+        "歐美",      // 1,111 comics
+        "WEBTOON",   // 1,066 comics
+        
+        // Very low availability categories (<1k comics)
+        "圓神領域",  // 547 comics
+        "SAO 刀劍神域", // 455 comics
+        "嗶咔漢化",  // 168 comics
+        
+        // Special categories (dynamic content)
+        "大家都在看",  // 40 comics
+        "大濕推薦",   // 20 comics
+        "那年今天",   // 3 comics
+        "官方都在看",  // 3 comics
     )
 
     private val staticCategoryTags: Set<MangaTag> = staticCategories.mapNotNullToSet { t ->
@@ -675,14 +684,17 @@ internal class PicacgParser(context: MangaLoaderContext) :
                 val bodyJson = JSONObject().apply {
                     put("keyword", query)
                     put("sort", sortParam(order))
+                    // 根据picacg.js的实现，动态标签搜索只需要keyword和sort参数
+                    // 不需要添加categories字段，否则会导致搜索失败
                 }
-                val res = webClient.httpPost(
-                    url = "$baseUrl/$path".toHttpUrl(),
-                    body = bodyJson,
-                    extraHeaders = buildApiHeaders("POST", path),
+                val res = httpPostNative(
+                    url = "$baseUrl/$path",
+                    headers = buildApiHeaders("POST", path),
+                    bodyJson = bodyJson,
                 )
+                
                 if (res.code == 401) throw AuthRequiredException(source)
-                val root = res.parseJson()
+                val root = JSONObject(res.body as String)
                 val docs = root.optJSONObject("data")?.optJSONObject("comics")?.optJSONArray("docs")
                     ?: JSONArray()
                 val out = mutableListOf<Manga>()

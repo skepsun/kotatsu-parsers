@@ -1,11 +1,11 @@
-package org.koitharu.kotatsu.parsers.site.mangareader.ar
+package org.skepsun.kototoro.parsers.site.mangareader.ar
 
-import org.koitharu.kotatsu.parsers.Broken
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.mangareader.MangaReaderParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.Broken
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.mangareader.MangaReaderParser
+import org.skepsun.kototoro.parsers.util.*
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.*

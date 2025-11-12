@@ -1,6 +1,6 @@
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaLoaderContext
 
 public class WebViewHelper(
 	private val context: MangaLoaderContext,

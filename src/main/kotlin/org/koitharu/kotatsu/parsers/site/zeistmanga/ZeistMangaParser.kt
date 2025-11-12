@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.site.zeistmanga
+package org.skepsun.kototoro.parsers.site.zeistmanga
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -6,15 +6,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import org.koitharu.kotatsu.parsers.ErrorMessages
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.PagedMangaParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.util.*
-import org.koitharu.kotatsu.parsers.util.json.asTypedList
-import org.koitharu.kotatsu.parsers.util.json.getStringOrNull
-import org.koitharu.kotatsu.parsers.util.json.mapJSON
+import org.skepsun.kototoro.parsers.ErrorMessages
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.util.*
+import org.skepsun.kototoro.parsers.util.json.asTypedList
+import org.skepsun.kototoro.parsers.util.json.getStringOrNull
+import org.skepsun.kototoro.parsers.util.json.mapJSON
 import java.text.SimpleDateFormat
 import java.util.*
 

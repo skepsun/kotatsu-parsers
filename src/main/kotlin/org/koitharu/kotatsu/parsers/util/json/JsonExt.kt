@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers.util.json
+package org.skepsun.kototoro.parsers.util.json
 
 import androidx.collection.ArraySet
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
-import org.koitharu.kotatsu.parsers.util.nullIfEmpty
+import org.skepsun.kototoro.parsers.util.nullIfEmpty
 import java.util.*
 import kotlin.contracts.contract
 

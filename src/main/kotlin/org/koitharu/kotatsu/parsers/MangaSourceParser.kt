@@ -1,6 +1,6 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
-import org.koitharu.kotatsu.parsers.model.ContentType
+import org.skepsun.kototoro.parsers.model.ContentType
 
 /**
  * Annotate each [MangaParser] implementation with this annotation, used by codegen

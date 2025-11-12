@@ -1,9 +1,9 @@
 @file:JvmName("MangaParsersUtils")
 
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
-import org.koitharu.kotatsu.parsers.model.MangaChapter
-import org.koitharu.kotatsu.parsers.model.MangaListFilter
+import org.skepsun.kototoro.parsers.model.MangaChapter
+import org.skepsun.kototoro.parsers.model.MangaListFilter
 import kotlin.contracts.contract
 
 public fun MangaListFilter?.isNullOrEmpty(): Boolean {

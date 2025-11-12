@@ -1,15 +1,15 @@
 @file:JvmName("JsoupUtils")
 
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
 import org.jsoup.select.QueryParser
 import org.jsoup.select.Selector
-import org.koitharu.kotatsu.core.parser.CSSBackground
-import org.koitharu.kotatsu.parsers.InternalParsersApi
-import org.koitharu.kotatsu.parsers.exception.ParseException
+import org.skepsun.kototoro.core.parser.CSSBackground
+import org.skepsun.kototoro.parsers.InternalParsersApi
+import org.skepsun.kototoro.parsers.exception.ParseException
 import kotlin.contracts.contract
 
 public val Element.host: String?

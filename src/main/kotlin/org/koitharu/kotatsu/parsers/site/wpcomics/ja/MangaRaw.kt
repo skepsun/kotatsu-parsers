@@ -1,11 +1,11 @@
-package org.koitharu.kotatsu.parsers.site.wpcomics.ja
+package org.skepsun.kototoro.parsers.site.wpcomics.ja
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.exception.NotFoundException
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.wpcomics.WpComicsParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.exception.NotFoundException
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.wpcomics.WpComicsParser
+import org.skepsun.kototoro.parsers.util.*
 
 // Need to use 0ms.dev Proxy
 

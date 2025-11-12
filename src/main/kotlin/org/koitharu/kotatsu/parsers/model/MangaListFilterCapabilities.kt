@@ -1,6 +1,6 @@
-package org.koitharu.kotatsu.parsers.model
+package org.skepsun.kototoro.parsers.model
 
-import org.koitharu.kotatsu.parsers.InternalParsersApi
+import org.skepsun.kototoro.parsers.InternalParsersApi
 
 public data class MangaListFilterCapabilities @InternalParsersApi constructor(
 

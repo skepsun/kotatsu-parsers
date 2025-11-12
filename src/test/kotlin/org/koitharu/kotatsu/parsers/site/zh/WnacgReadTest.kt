@@ -1,13 +1,13 @@
-package org.koitharu.kotatsu.parsers.site.zh
+package org.skepsun.kototoro.parsers.site.zh
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.time.Duration.Companion.minutes
-import org.koitharu.kotatsu.parsers.MangaLoaderContextMock
-import org.koitharu.kotatsu.parsers.model.Manga
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.RATING_UNKNOWN
+import org.skepsun.kototoro.parsers.MangaLoaderContextMock
+import org.skepsun.kototoro.parsers.model.Manga
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.RATING_UNKNOWN
 
 class WnacgReadTest {
 

@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers.site.scan.fr
+package org.skepsun.kototoro.parsers.site.scan.fr
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.scan.ScanParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.scan.ScanParser
+import org.skepsun.kototoro.parsers.util.*
 import java.text.SimpleDateFormat
 
 @MangaSourceParser("MANGAFR", "MangaFr", "fr")

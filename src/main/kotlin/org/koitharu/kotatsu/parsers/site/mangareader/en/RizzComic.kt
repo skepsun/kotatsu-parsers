@@ -1,17 +1,17 @@
-package org.koitharu.kotatsu.parsers.site.mangareader.en
+package org.skepsun.kototoro.parsers.site.mangareader.en
 
 import androidx.collection.ArrayMap
 import kotlinx.coroutines.sync.withLock
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.mangareader.MangaReaderParser
-import org.koitharu.kotatsu.parsers.util.*
-import org.koitharu.kotatsu.parsers.util.json.getFloatOrDefault
-import org.koitharu.kotatsu.parsers.util.json.getStringOrNull
-import org.koitharu.kotatsu.parsers.util.json.mapJSON
-import org.koitharu.kotatsu.parsers.util.suspendlazy.suspendLazy
-import org.koitharu.kotatsu.parsers.Broken
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.mangareader.MangaReaderParser
+import org.skepsun.kototoro.parsers.util.*
+import org.skepsun.kototoro.parsers.util.json.getFloatOrDefault
+import org.skepsun.kototoro.parsers.util.json.getStringOrNull
+import org.skepsun.kototoro.parsers.util.json.mapJSON
+import org.skepsun.kototoro.parsers.util.suspendlazy.suspendLazy
+import org.skepsun.kototoro.parsers.Broken
 import java.util.*
 
 @Broken

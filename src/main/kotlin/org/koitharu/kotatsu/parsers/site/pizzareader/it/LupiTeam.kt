@@ -1,9 +1,9 @@
-package org.koitharu.kotatsu.parsers.site.pizzareader.it
+package org.skepsun.kototoro.parsers.site.pizzareader.it
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.pizzareader.PizzaReaderParser
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.pizzareader.PizzaReaderParser
 
 @MangaSourceParser("LUPITEAM", "LupiTeam", "it")
 internal class LupiTeam(context: MangaLoaderContext) :

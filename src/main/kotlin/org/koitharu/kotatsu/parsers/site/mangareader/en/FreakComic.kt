@@ -1,16 +1,16 @@
-package org.koitharu.kotatsu.parsers.site.mangareader.en
+package org.skepsun.kototoro.parsers.site.mangareader.en
 
 import androidx.collection.ArrayMap
 import kotlinx.coroutines.sync.withLock
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import org.koitharu.kotatsu.parsers.Broken
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaListFilterCapabilities
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.MangaTag
-import org.koitharu.kotatsu.parsers.site.mangareader.MangaReaderParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.Broken
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaListFilterCapabilities
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.MangaTag
+import org.skepsun.kototoro.parsers.site.mangareader.MangaReaderParser
+import org.skepsun.kototoro.parsers.util.*
 
 @Broken
 @MangaSourceParser("FREAKCOMIC", "FreakComic", "en")

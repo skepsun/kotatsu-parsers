@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.model
+package org.skepsun.kototoro.parsers.model
 
 public interface MangaSource {
 

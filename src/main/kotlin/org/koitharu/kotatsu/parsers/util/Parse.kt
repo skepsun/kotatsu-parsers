@@ -1,6 +1,6 @@
 @file:JvmName("ParseUtils")
 
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
 import okhttp3.Response
 import okhttp3.ResponseBody
@@ -8,7 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import org.koitharu.kotatsu.parsers.InternalParsersApi
+import org.skepsun.kototoro.parsers.InternalParsersApi
 import java.text.DateFormat
 
 private val REGEX_SCHEME_PREFIX = Regex("^\\w{2,6}://", RegexOption.IGNORE_CASE)

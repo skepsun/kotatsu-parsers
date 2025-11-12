@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.model.search
+package org.skepsun.kototoro.parsers.model.search
 
 import kotlin.reflect.KClass
 

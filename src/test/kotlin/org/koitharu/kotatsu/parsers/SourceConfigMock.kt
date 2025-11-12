@@ -1,7 +1,7 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.config.MangaSourceConfig
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.config.MangaSourceConfig
 
 internal class SourceConfigMock : MangaSourceConfig {
 

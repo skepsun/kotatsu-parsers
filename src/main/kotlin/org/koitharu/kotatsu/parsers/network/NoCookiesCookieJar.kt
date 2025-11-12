@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.network
+package org.skepsun.kototoro.parsers.network
 
 import okhttp3.Cookie
 import okhttp3.CookieJar

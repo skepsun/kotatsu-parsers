@@ -1,7 +1,7 @@
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
-import org.koitharu.kotatsu.parsers.InternalParsersApi
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.InternalParsersApi
+import org.skepsun.kototoro.parsers.MangaLoaderContext
 import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec

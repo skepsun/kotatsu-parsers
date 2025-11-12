@@ -1,35 +1,35 @@
-package org.koitharu.kotatsu.parsers.site.zh
+package org.skepsun.kototoro.parsers.site.zh
 
 import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.PagedMangaParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.util.generateUid
-import org.koitharu.kotatsu.parsers.util.json.mapJSON
-import org.koitharu.kotatsu.parsers.util.json.mapJSONIndexed
-import org.koitharu.kotatsu.parsers.util.json.mapJSONNotNull
-import org.koitharu.kotatsu.parsers.util.toAbsoluteUrl
-import org.koitharu.kotatsu.parsers.util.parseJson
-import org.koitharu.kotatsu.parsers.util.getCookies
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.util.generateUid
+import org.skepsun.kototoro.parsers.util.json.mapJSON
+import org.skepsun.kototoro.parsers.util.json.mapJSONIndexed
+import org.skepsun.kototoro.parsers.util.json.mapJSONNotNull
+import org.skepsun.kototoro.parsers.util.toAbsoluteUrl
+import org.skepsun.kototoro.parsers.util.parseJson
+import org.skepsun.kototoro.parsers.util.getCookies
 import java.util.*
 import okhttp3.Headers
-import org.koitharu.kotatsu.parsers.network.UserAgents
-import org.koitharu.kotatsu.parsers.exception.ParseException
-import org.koitharu.kotatsu.parsers.util.mimeType
-import org.koitharu.kotatsu.parsers.util.parseRaw
-import org.koitharu.kotatsu.parsers.util.parseHtml
+import org.skepsun.kototoro.parsers.network.UserAgents
+import org.skepsun.kototoro.parsers.exception.ParseException
+import org.skepsun.kototoro.parsers.util.mimeType
+import org.skepsun.kototoro.parsers.util.parseRaw
+import org.skepsun.kototoro.parsers.util.parseHtml
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.Response
 import okhttp3.Request
 import kotlinx.coroutines.delay
-import org.koitharu.kotatsu.parsers.util.json.mapJSONNotNullToSet
-import org.koitharu.kotatsu.parsers.util.mapToSet
-import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
+import org.skepsun.kototoro.parsers.util.json.mapJSONNotNullToSet
+import org.skepsun.kototoro.parsers.util.mapToSet
+import org.skepsun.kototoro.parsers.util.runCatchingCancellable
 
 @MangaSourceParser("KOMIIC", "Komiic", "zh")
 internal class KomiicParser(context: MangaLoaderContext) :

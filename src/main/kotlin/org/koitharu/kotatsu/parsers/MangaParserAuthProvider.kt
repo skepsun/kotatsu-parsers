@@ -1,7 +1,7 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
-import org.koitharu.kotatsu.parsers.exception.AuthRequiredException
-import org.koitharu.kotatsu.parsers.exception.ParseException
+import org.skepsun.kototoro.parsers.exception.AuthRequiredException
+import org.skepsun.kototoro.parsers.exception.ParseException
 
 /**
  * Implement this in your parser for authorization support

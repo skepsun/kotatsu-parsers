@@ -1,8 +1,8 @@
-package org.koitharu.kotatsu.parsers.exception
+package org.skepsun.kototoro.parsers.exception
 
 import okio.IOException
-import org.koitharu.kotatsu.parsers.InternalParsersApi
-import org.koitharu.kotatsu.parsers.model.MangaSource
+import org.skepsun.kototoro.parsers.InternalParsersApi
+import org.skepsun.kototoro.parsers.model.MangaSource
 
 /**
  * Authorization is required for access to the requested content

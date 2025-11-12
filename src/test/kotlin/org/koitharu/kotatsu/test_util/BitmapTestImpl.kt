@@ -1,7 +1,7 @@
-package org.koitharu.kotatsu.test_util
+package org.skepsun.kototoro.test_util
 
-import org.koitharu.kotatsu.parsers.bitmap.Bitmap
-import org.koitharu.kotatsu.parsers.bitmap.Rect
+import org.skepsun.kototoro.parsers.bitmap.Bitmap
+import org.skepsun.kototoro.parsers.bitmap.Rect
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO

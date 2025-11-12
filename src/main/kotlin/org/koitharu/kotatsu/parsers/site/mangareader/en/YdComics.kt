@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers.site.mangareader.en
+package org.skepsun.kototoro.parsers.site.mangareader.en
 
-import org.koitharu.kotatsu.parsers.Broken
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.mangareader.MangaReaderParser
+import org.skepsun.kototoro.parsers.Broken
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.mangareader.MangaReaderParser
 
 @Broken
 @MangaSourceParser("YDCOMICS", "YdComics", "en")

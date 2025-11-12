@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
 import okhttp3.Interceptor
 import okhttp3.Request
 import okhttp3.Response
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.MangaSource
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.MangaSource
 
 private const val HEADER_REFERER = "Referer"
 

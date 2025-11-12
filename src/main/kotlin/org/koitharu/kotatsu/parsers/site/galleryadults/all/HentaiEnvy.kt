@@ -1,13 +1,13 @@
-package org.koitharu.kotatsu.parsers.site.galleryadults.all
+package org.skepsun.kototoro.parsers.site.galleryadults.all
 
-import org.koitharu.kotatsu.parsers.ErrorMessages
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.galleryadults.GalleryAdultsParser
-import org.koitharu.kotatsu.parsers.util.oneOrThrowIfMany
-import org.koitharu.kotatsu.parsers.util.parseHtml
-import org.koitharu.kotatsu.parsers.util.urlEncoded
+import org.skepsun.kototoro.parsers.ErrorMessages
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.galleryadults.GalleryAdultsParser
+import org.skepsun.kototoro.parsers.util.oneOrThrowIfMany
+import org.skepsun.kototoro.parsers.util.parseHtml
+import org.skepsun.kototoro.parsers.util.urlEncoded
 import java.util.*
 
 @MangaSourceParser("HENTAIENVY", "HentaiEnvy", type = ContentType.HENTAI)

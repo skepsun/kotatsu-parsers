@@ -1,6 +1,6 @@
-package org.koitharu.kotatsu.parsers.util.suspendlazy
+package org.skepsun.kototoro.parsers.util.suspendlazy
 
-import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
+import org.skepsun.kototoro.parsers.util.runCatchingCancellable
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 

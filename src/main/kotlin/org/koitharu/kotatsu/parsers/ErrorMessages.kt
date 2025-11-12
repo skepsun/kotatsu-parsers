@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
 public object ErrorMessages {
 

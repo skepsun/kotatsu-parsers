@@ -1,11 +1,11 @@
-package org.koitharu.kotatsu.parsers.site.fuzzydoodle.ar
+package org.skepsun.kototoro.parsers.site.fuzzydoodle.ar
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.ContentType
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.MangaState
-import org.koitharu.kotatsu.parsers.site.fuzzydoodle.FuzzyDoodleParser
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.ContentType
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.MangaState
+import org.skepsun.kototoro.parsers.site.fuzzydoodle.FuzzyDoodleParser
 import java.util.*
 
 @MangaSourceParser("HENTAISLAYER", "HentaiSlayer", "ar", ContentType.HENTAI)

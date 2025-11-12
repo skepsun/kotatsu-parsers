@@ -1,8 +1,8 @@
-package org.koitharu.kotatsu.parsers.model.search
+package org.skepsun.kototoro.parsers.model.search
 
 import androidx.collection.ArrayMap
 import androidx.collection.ArraySet
-import org.koitharu.kotatsu.parsers.model.SortOrder
+import org.skepsun.kototoro.parsers.model.SortOrder
 
 /**
  * Represents a search query for filtering and sorting manga search results.

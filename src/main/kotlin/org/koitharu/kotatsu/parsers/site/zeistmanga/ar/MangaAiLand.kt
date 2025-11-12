@@ -1,13 +1,13 @@
-package org.koitharu.kotatsu.parsers.site.zeistmanga.ar
+package org.skepsun.kototoro.parsers.site.zeistmanga.ar
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.MangaTag
-import org.koitharu.kotatsu.parsers.site.zeistmanga.ZeistMangaParser
-import org.koitharu.kotatsu.parsers.util.mapToSet
-import org.koitharu.kotatsu.parsers.util.parseHtml
-import org.koitharu.kotatsu.parsers.util.requireElementById
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.MangaTag
+import org.skepsun.kototoro.parsers.site.zeistmanga.ZeistMangaParser
+import org.skepsun.kototoro.parsers.util.mapToSet
+import org.skepsun.kototoro.parsers.util.parseHtml
+import org.skepsun.kototoro.parsers.util.requireElementById
 
 @MangaSourceParser("MANGAAILAND", "MangaAiLand", "ar")
 internal class MangaAiLand(context: MangaLoaderContext) :

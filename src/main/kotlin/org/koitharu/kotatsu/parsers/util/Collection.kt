@@ -1,6 +1,6 @@
 @file:JvmName("CollectionUtils")
 
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
 import androidx.collection.ArrayMap
 import androidx.collection.ArraySet

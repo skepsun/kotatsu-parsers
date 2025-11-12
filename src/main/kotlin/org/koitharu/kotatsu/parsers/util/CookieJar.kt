@@ -1,6 +1,6 @@
 @file:JvmName("CookieJarUtils")
 
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
 import okhttp3.Cookie
 import okhttp3.CookieJar

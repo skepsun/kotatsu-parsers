@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.util.json
+package org.skepsun.kototoro.parsers.util.json
 
 public fun String.unescapeJson(): String {
 	val builder = StringBuilder()

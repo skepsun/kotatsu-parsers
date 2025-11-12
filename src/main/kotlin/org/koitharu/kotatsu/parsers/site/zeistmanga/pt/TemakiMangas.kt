@@ -1,12 +1,12 @@
-package org.koitharu.kotatsu.parsers.site.zeistmanga.pt
+package org.skepsun.kototoro.parsers.site.zeistmanga.pt
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.zeistmanga.ZeistMangaParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.zeistmanga.ZeistMangaParser
+import org.skepsun.kototoro.parsers.util.*
 
 @MangaSourceParser("TEMAKIMANGAS", "TemakiMangas", "pt")
 internal class TemakiMangas(context: MangaLoaderContext) :

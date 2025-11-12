@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.util.suspendlazy
+package org.skepsun.kototoro.parsers.util.suspendlazy
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

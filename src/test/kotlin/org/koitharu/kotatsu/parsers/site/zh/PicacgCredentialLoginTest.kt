@@ -1,21 +1,21 @@
-package org.koitharu.kotatsu.parsers.site.zh
+package org.skepsun.kototoro.parsers.site.zh
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import kotlin.time.Duration.Companion.minutes
-import org.koitharu.kotatsu.parsers.MangaLoaderContextIsolated
-import org.koitharu.kotatsu.parsers.MangaParserCredentialsAuthProvider
-import org.koitharu.kotatsu.parsers.MangaParserAuthProvider
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.util.getCookies
+import org.skepsun.kototoro.parsers.MangaLoaderContextIsolated
+import org.skepsun.kototoro.parsers.MangaParserCredentialsAuthProvider
+import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.util.getCookies
 
 /**
  * Picacg 凭证登录集成测试：不依赖预置 token，直接使用邮箱/密码登录并获取用户名。
  *
  * 运行示例：
- * PICACG_EMAIL="your_email" PICACG_PASSWORD="your_password" ./gradlew :kotatsu-parsers:test --tests "org.koitharu.kotatsu.parsers.site.zh.PicacgCredentialLoginTest"
+ * PICACG_EMAIL="your_email" PICACG_PASSWORD="your_password" ./gradlew :kototoro-parsers:test --tests "org.skepsun.kototoro.parsers.site.zh.PicacgCredentialLoginTest"
  */
 class PicacgCredentialLoginTest {
 

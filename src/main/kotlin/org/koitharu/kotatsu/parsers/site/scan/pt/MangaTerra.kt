@@ -1,9 +1,9 @@
-package org.koitharu.kotatsu.parsers.site.scan.pt
+package org.skepsun.kototoro.parsers.site.scan.pt
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.scan.ScanParser
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.scan.ScanParser
 
 @MangaSourceParser("MANGATERRA", "MangaTerra", "pt")
 internal class MangaTerra(context: MangaLoaderContext) :

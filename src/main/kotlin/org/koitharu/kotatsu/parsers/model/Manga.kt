@@ -1,8 +1,8 @@
-package org.koitharu.kotatsu.parsers.model
+package org.skepsun.kototoro.parsers.model
 
 import androidx.collection.ArrayMap
-import org.koitharu.kotatsu.parsers.util.findById
-import org.koitharu.kotatsu.parsers.util.nullIfEmpty
+import org.skepsun.kototoro.parsers.util.findById
+import org.skepsun.kototoro.parsers.util.nullIfEmpty
 
 public data class Manga(
 	/**

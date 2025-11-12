@@ -1,11 +1,11 @@
-package org.koitharu.kotatsu.parsers.site.mangareader.es
+package org.skepsun.kototoro.parsers.site.mangareader.es
 
 import org.json.JSONObject
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.mangareader.MangaReaderParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.mangareader.MangaReaderParser
+import org.skepsun.kototoro.parsers.util.*
 import java.text.SimpleDateFormat
 
 @MangaSourceParser("HENTAIREADER", "HentaiReader", "es", ContentType.HENTAI)

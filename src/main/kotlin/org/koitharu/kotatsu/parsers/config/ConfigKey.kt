@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.config
+package org.skepsun.kototoro.parsers.config
 
 public sealed class ConfigKey<T>(
 	@JvmField public val key: String,

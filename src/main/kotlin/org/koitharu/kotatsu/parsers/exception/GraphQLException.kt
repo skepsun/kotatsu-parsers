@@ -1,9 +1,9 @@
-package org.koitharu.kotatsu.parsers.exception
+package org.skepsun.kototoro.parsers.exception
 
 import okio.IOException
 import org.json.JSONArray
-import org.koitharu.kotatsu.parsers.InternalParsersApi
-import org.koitharu.kotatsu.parsers.util.json.mapJSONNotNull
+import org.skepsun.kototoro.parsers.InternalParsersApi
+import org.skepsun.kototoro.parsers.util.json.mapJSONNotNull
 
 public class GraphQLException @InternalParsersApi constructor(errors: JSONArray) : IOException() {
 

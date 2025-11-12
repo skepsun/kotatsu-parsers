@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers.site.onemanga.fr
+package org.skepsun.kototoro.parsers.site.onemanga.fr
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.onemanga.OneMangaParser
-import org.koitharu.kotatsu.parsers.Broken
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.onemanga.OneMangaParser
+import org.skepsun.kototoro.parsers.Broken
 
 @Broken("Original site closed")
 @MangaSourceParser("CENTURYBOYS20TH", "20ThCenturyBoys", "fr")

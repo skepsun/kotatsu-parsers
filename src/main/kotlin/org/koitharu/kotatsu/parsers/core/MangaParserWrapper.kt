@@ -1,15 +1,15 @@
-package org.koitharu.kotatsu.parsers.core
+package org.skepsun.kototoro.parsers.core
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
 import okhttp3.Request
 import okhttp3.Response
-import org.koitharu.kotatsu.parsers.MangaParser
-import org.koitharu.kotatsu.parsers.MangaParserAuthProvider
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.model.search.MangaSearchQuery
-import org.koitharu.kotatsu.parsers.util.mergeWith
+import org.skepsun.kototoro.parsers.MangaParser
+import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.model.search.MangaSearchQuery
+import org.skepsun.kototoro.parsers.util.mergeWith
 
 internal class MangaParserWrapper(
 	private val delegate: MangaParser,

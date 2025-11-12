@@ -1,6 +1,6 @@
 @file:JvmName("Constants")
 
-package org.koitharu.kotatsu.parsers.model
+package org.skepsun.kototoro.parsers.model
 
 public const val RATING_UNKNOWN: Float = -1f
 

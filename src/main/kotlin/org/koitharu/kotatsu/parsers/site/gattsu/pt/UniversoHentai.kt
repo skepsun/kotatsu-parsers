@@ -1,11 +1,11 @@
-package org.koitharu.kotatsu.parsers.site.gattsu.pt
+package org.skepsun.kototoro.parsers.site.gattsu.pt
 
 import org.jsoup.nodes.Element
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.gattsu.GattsuParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.gattsu.GattsuParser
+import org.skepsun.kototoro.parsers.util.*
 
 @MangaSourceParser("UNIVERSOHENTAI", "UniversoHentai", "pt", ContentType.HENTAI)
 internal class UniversoHentai(context: MangaLoaderContext) :

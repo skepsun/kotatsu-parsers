@@ -1,13 +1,13 @@
-# Kotatsu 解析器扩展
+# Kototoro 解析器扩展
 
 ## 基础信息
-- 原始仓库（Original Repository）：[kotatsu-parsers](https://github.com/KotatsuApp/kotatsu-parsers)
+- 原始仓库（Original Repository）：[kototoro-parsers](https://github.com/KotatsuApp/kotatsu-parsers)
 - 中文站点解析器来源（Original Chinese Sites Parsers Source）：[venera-configs](https://github.com/venera-app/venera-configs)
 
 ## 关于本仓库（About This Repository）
 ### 目标（Target）
-将 Venera 的解析器（含优化后的过滤器）迁移适配至 Kotatsu 平台  
-Convert parsers from Venera (with improved filters) to Kotatsu
+将 Venera 的解析器（含优化后的过滤器）迁移适配至 Kototoro 平台  
+Convert parsers from Venera (with improved filters) to Kototoro
 
 ### 已完成（Done）
 - [x] Komiic

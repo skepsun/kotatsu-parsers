@@ -1,14 +1,14 @@
-package org.koitharu.kotatsu.parsers.site.heancmsalt.es
+package org.skepsun.kototoro.parsers.site.heancmsalt.es
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.Manga
-import org.koitharu.kotatsu.parsers.model.MangaChapter
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.heancmsalt.HeanCmsAlt
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.Manga
+import org.skepsun.kototoro.parsers.model.MangaChapter
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.heancmsalt.HeanCmsAlt
+import org.skepsun.kototoro.parsers.util.*
 import java.text.SimpleDateFormat
-import org.koitharu.kotatsu.parsers.Broken
+import org.skepsun.kototoro.parsers.Broken
 
 @Broken
 @MangaSourceParser("BRAKEOUT", "Brakeout", "es")

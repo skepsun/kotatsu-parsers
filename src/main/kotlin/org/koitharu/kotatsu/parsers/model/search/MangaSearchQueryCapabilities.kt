@@ -1,8 +1,8 @@
-package org.koitharu.kotatsu.parsers.model.search
+package org.skepsun.kototoro.parsers.model.search
 
 import androidx.collection.ArraySet
-import org.koitharu.kotatsu.parsers.model.search.QueryCriteria.*
-import org.koitharu.kotatsu.parsers.util.mapToSet
+import org.skepsun.kototoro.parsers.model.search.QueryCriteria.*
+import org.skepsun.kototoro.parsers.util.mapToSet
 
 @Deprecated("Too complex. Use MangaListFilterCapabilities instead")
 @ExposedCopyVisibility

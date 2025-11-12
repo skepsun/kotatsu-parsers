@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.ksp
+package org.skepsun.kototoro.parsers.ksp
 
 import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.processing.*
@@ -20,7 +20,7 @@ class ParserProcessor(
     private val sourceNamePattern = Regex("[A-Z_][A-Z0-9_]{3,}")
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val symbols = resolver.getSymbolsWithAnnotation("org.koitharu.kotatsu.parsers.MangaSourceParser")
+        val symbols = resolver.getSymbolsWithAnnotation("org.skepsun.kototoro.parsers.MangaSourceParser")
         val ret = symbols.filterNot { it.validate() }.toList()
         if (!symbols.iterator().hasNext()) {
             return ret
@@ -30,7 +30,7 @@ class ParserProcessor(
             try {
                 codeGenerator.createNewFile(
                     dependencies = dependencies,
-                    packageName = "org.koitharu.kotatsu.parsers",
+                    packageName = "org.skepsun.kototoro.parsers",
                     fileName = "MangaParserFactory",
                 )
             } catch (e: FileAlreadyExistsException) {
@@ -41,7 +41,7 @@ class ParserProcessor(
             try {
                 codeGenerator.createNewFile(
                     dependencies = dependencies,
-                    packageName = "org.koitharu.kotatsu.parsers.model",
+                    packageName = "org.skepsun.kototoro.parsers.model",
                     fileName = "MangaSource",
                 )
             } catch (e: FileAlreadyExistsException) {
@@ -67,10 +67,10 @@ class ParserProcessor(
         }
         factoryWriter?.write(
             """
-			package org.koitharu.kotatsu.parsers
+			package org.skepsun.kototoro.parsers
 
-			import org.koitharu.kotatsu.parsers.model.MangaParserSource
-			import org.koitharu.kotatsu.parsers.core.MangaParserWrapper
+			import org.skepsun.kototoro.parsers.model.MangaParserSource
+			import org.skepsun.kototoro.parsers.core.MangaParserWrapper
 
 			internal fun MangaParserSource.newParser(context: MangaLoaderContext): MangaParser = when (this) {
 
@@ -78,7 +78,7 @@ class ParserProcessor(
         )
         sourcesWriter?.write(
             """
-			package org.koitharu.kotatsu.parsers.model
+			package org.skepsun.kototoro.parsers.model
 
 			public enum class MangaParserSource(
 				public val title: String,

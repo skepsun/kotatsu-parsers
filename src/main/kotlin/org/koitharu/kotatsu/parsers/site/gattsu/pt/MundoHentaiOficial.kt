@@ -1,14 +1,14 @@
-package org.koitharu.kotatsu.parsers.site.gattsu.pt
+package org.skepsun.kototoro.parsers.site.gattsu.pt
 
 import org.jsoup.nodes.Document
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.gattsu.GattsuParser
-import org.koitharu.kotatsu.parsers.util.attrAsAbsoluteUrl
-import org.koitharu.kotatsu.parsers.util.generateUid
-import org.koitharu.kotatsu.parsers.util.selectLastOrThrow
-import org.koitharu.kotatsu.parsers.util.src
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.gattsu.GattsuParser
+import org.skepsun.kototoro.parsers.util.attrAsAbsoluteUrl
+import org.skepsun.kototoro.parsers.util.generateUid
+import org.skepsun.kototoro.parsers.util.selectLastOrThrow
+import org.skepsun.kototoro.parsers.util.src
 
 @MangaSourceParser("MUNDOHENTAIOFICIAL", "MundoHentaiOficial", "pt", ContentType.HENTAI)
 internal class MundoHentaiOficial(context: MangaLoaderContext) :

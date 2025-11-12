@@ -1,13 +1,13 @@
-package org.koitharu.kotatsu.parsers.site.keyoapp.en
+package org.skepsun.kototoro.parsers.site.keyoapp.en
 
 import org.jsoup.nodes.Element
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.keyoapp.KeyoappParser
-import org.koitharu.kotatsu.parsers.util.styleValueOrNull
-import org.koitharu.kotatsu.parsers.util.cssUrl
-import org.koitharu.kotatsu.parsers.Broken
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.keyoapp.KeyoappParser
+import org.skepsun.kototoro.parsers.util.styleValueOrNull
+import org.skepsun.kototoro.parsers.util.cssUrl
+import org.skepsun.kototoro.parsers.Broken
 
 @Broken // It seems like the site is dead.
 @MangaSourceParser("AGSCOMICS", "AgsComics", "en")

@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers.site.mangareader.id
+package org.skepsun.kototoro.parsers.site.mangareader.id
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaListFilterCapabilities
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.mangareader.MangaReaderParser
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaListFilterCapabilities
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.mangareader.MangaReaderParser
 
 @MangaSourceParser("SIRENKOMIK", "SirenKomik", "id")
 internal class SirenKomik(context: MangaLoaderContext) :

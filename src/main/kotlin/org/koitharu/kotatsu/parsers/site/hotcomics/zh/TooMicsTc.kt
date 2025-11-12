@@ -1,9 +1,9 @@
-package org.koitharu.kotatsu.parsers.site.hotcomics.zh
+package org.skepsun.kototoro.parsers.site.hotcomics.zh
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.hotcomics.HotComicsParser
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.hotcomics.HotComicsParser
 
 @MangaSourceParser("TOOMICSTC", "TooMicsTc", "zh")
 internal class TooMicsTc(context: MangaLoaderContext) :

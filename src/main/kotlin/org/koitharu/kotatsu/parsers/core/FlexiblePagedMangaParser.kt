@@ -1,12 +1,12 @@
-package org.koitharu.kotatsu.parsers.core
+package org.skepsun.kototoro.parsers.core
 
 import androidx.annotation.VisibleForTesting
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.model.Manga
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.search.MangaSearchQuery
-import org.koitharu.kotatsu.parsers.model.search.SearchableField
-import org.koitharu.kotatsu.parsers.util.Paginator
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.model.Manga
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.search.MangaSearchQuery
+import org.skepsun.kototoro.parsers.model.search.SearchableField
+import org.skepsun.kototoro.parsers.util.Paginator
 
 @Deprecated("Too complex. Use PagedMangaParser instead")
 internal abstract class FlexiblePagedMangaParser(

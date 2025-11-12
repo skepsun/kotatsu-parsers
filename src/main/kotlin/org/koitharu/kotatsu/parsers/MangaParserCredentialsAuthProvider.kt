@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
 /**
  * Optional interface for parsers that support in-app username/password login.

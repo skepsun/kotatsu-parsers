@@ -1,13 +1,13 @@
-package org.koitharu.kotatsu.parsers.site.foolslide.es
+package org.skepsun.kototoro.parsers.site.foolslide.es
 
 import kotlinx.coroutines.coroutineScope
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.ContentType
-import org.koitharu.kotatsu.parsers.model.Manga
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.foolslide.FoolSlideParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.ContentType
+import org.skepsun.kototoro.parsers.model.Manga
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.foolslide.FoolSlideParser
+import org.skepsun.kototoro.parsers.util.*
 
 @MangaSourceParser("SEINAGIADULTO", "Seinagi Adulto", "es", ContentType.HENTAI)
 internal class SeinagiAdulto(context: MangaLoaderContext) :

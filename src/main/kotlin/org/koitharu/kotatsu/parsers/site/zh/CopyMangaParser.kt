@@ -1,5 +1,5 @@
-@file:OptIn(org.koitharu.kotatsu.parsers.InternalParsersApi::class)
-package org.koitharu.kotatsu.parsers.site.zh
+@file:OptIn(org.skepsun.kototoro.parsers.InternalParsersApi::class)
+package org.skepsun.kototoro.parsers.site.zh
 
 import okhttp3.Headers
 import okhttp3.Interceptor
@@ -7,29 +7,29 @@ import okhttp3.Response
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.InternalParsersApi
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.PagedMangaParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.network.UserAgents
-import org.koitharu.kotatsu.parsers.util.generateUid
-import org.koitharu.kotatsu.parsers.util.getCookies
-import org.koitharu.kotatsu.parsers.util.insertCookies
-import org.koitharu.kotatsu.parsers.util.copyCookies
-import org.koitharu.kotatsu.parsers.util.json.mapJSON
-import org.koitharu.kotatsu.parsers.util.json.mapJSONIndexed
-import org.koitharu.kotatsu.parsers.util.parseJson
-import org.koitharu.kotatsu.parsers.util.urlEncoded
-import org.koitharu.kotatsu.parsers.exception.ParseException
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.InternalParsersApi
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.config.ConfigKey
+import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.network.UserAgents
+import org.skepsun.kototoro.parsers.util.generateUid
+import org.skepsun.kototoro.parsers.util.getCookies
+import org.skepsun.kototoro.parsers.util.insertCookies
+import org.skepsun.kototoro.parsers.util.copyCookies
+import org.skepsun.kototoro.parsers.util.json.mapJSON
+import org.skepsun.kototoro.parsers.util.json.mapJSONIndexed
+import org.skepsun.kototoro.parsers.util.parseJson
+import org.skepsun.kototoro.parsers.util.urlEncoded
+import org.skepsun.kototoro.parsers.exception.ParseException
 import java.util.Base64
 import kotlin.random.Random
 import java.util.EnumSet
 
 /**
  * 拷贝漫画（新站）解析器
- * 参考 /Users/sunchuxiong/kotatsu_demo/copymanga.js
+ * 参考 /Users/sunchuxiong/kototoro_demo/copymanga.js
  */
 @MangaSourceParser("COPYMANGA", "拷贝漫画", "zh")
 @OptIn(InternalParsersApi::class)
@@ -78,6 +78,65 @@ internal class CopyMangaParser(context: MangaLoaderContext) :
     private val CATEGORY_PARAM_DICT: Map<String, String> = mapOf(
         // 最小可用映射，用户反馈可正常浏览
         "爱情" to "aiqing",
+        "歡樂向" to "huanlexiang",
+        "冒險" to "maoxian",
+        "奇幻" to "qihuan",
+        "百合" to "baihe",
+        "校园" to "xiaoyuan",
+        "科幻" to "kehuan",
+        "東方" to "dongfang",
+        "耽美" to "danmei",
+        "生活" to "shenghuo",
+        "格鬥" to "gedou",
+        "轻小说" to "qingxiaoshuo",
+        "悬疑" to "xuanyi",
+        "其他" to "qita",
+        "神鬼" to "shengui",
+        "职场" to "zhichang",
+        "TL" to "teenslove",
+        "萌系" to "mengxi",
+        "治愈" to "zhiyu",
+        "長條" to "changtiao",
+        "四格" to "sige",
+        "节操" to "jiecao",
+        "舰娘" to "jianniang",
+        "竞技" to "jingji",
+        "搞笑" to "gaoxiao",
+        "伪娘" to "weiniang",
+        "热血" to "rexue",
+        "励志" to "lizhi",
+        "性转换" to "xingzhuanhuan",
+        "彩色" to "COLOR",
+        "後宮" to "hougong",
+        "美食" to "meishi",
+        "侦探" to "zhentan",
+        "AA" to "aa",
+        "音乐舞蹈" to "yinyuewudao",
+        "魔幻" to "mohuan",
+        "战争" to "zhanzheng",
+        "历史" to "lishi",
+        "异世界" to "yishijie",
+        "惊悚" to "jingsong",
+        "机战" to "jizhan",
+        "都市" to "dushi",
+        "穿越" to "chuanyue",
+        "恐怖" to "kongbu",
+        "C100" to "comiket100",
+        "重生" to "chongsheng",
+        "C99" to "comiket99",
+        "C101" to "comiket101",
+        "C97" to "comiket97",
+        "C96" to "comiket96",
+        "生存" to "shengcun",
+        "宅系" to "zhaixi",
+        "武侠" to "wuxia",
+        "C98" to "C98",
+        "C95" to "comiket95",
+        "FATE" to "fate",
+        "转生" to "zhuansheng",
+        "無修正" to "Uncensored",
+        "仙侠" to "xianxia",
+        "LoveLive" to "loveLive"
     )
 
     @OptIn(InternalParsersApi::class)
@@ -94,8 +153,9 @@ internal class CopyMangaParser(context: MangaLoaderContext) :
     @OptIn(InternalParsersApi::class)
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.UPDATED,
-        SortOrder.POPULARITY_MONTH,
+        SortOrder.UPDATED_ASC,
         SortOrder.POPULARITY,
+        SortOrder.POPULARITY_ASC,
     )
 
     @OptIn(InternalParsersApi::class)
@@ -113,9 +173,8 @@ internal class CopyMangaParser(context: MangaLoaderContext) :
         val themeTags: Set<MangaTag> = CATEGORY_PARAM_DICT.entries.map { entry ->
             MangaTag(title = entry.key, key = entry.value, source = source)
         }.toSet()
-        val rankingTag = MangaTag(title = "排行", key = "ranking", source = source)
         return MangaListFilterOptions(
-            availableTags = themeTags + setOf(rankingTag),
+            availableTags = themeTags,
             availableStates = EnumSet.of(MangaState.ONGOING, MangaState.FINISHED),
             availableContentRating = emptySet(),
         )
@@ -224,8 +283,9 @@ internal class CopyMangaParser(context: MangaLoaderContext) :
         val isRanking = filter.tags.any { it.key == "ranking" }
         val url = if (isRanking) {
             // 排行接口：audience_type 与 date_type 作为“选项”绑定到 tags 中的 key 或查询
-            val audience = filter.query?.substringBefore('|') ?: "1" // 默认 type=1
+            val audience = filter.query?.substringBefore('|') ?: "male" // 默认男频
             val dateType = filter.query?.substringAfter('|') ?: "month" // 默认最近30天
+            
             buildString {
                 append("https://")
                 append(base)
@@ -259,7 +319,13 @@ internal class CopyMangaParser(context: MangaLoaderContext) :
         } else {
             // 主题分类列表
             val themeParam = filter.tags.firstOrNull()?.key ?: ""
-            val ordering = "-datetime_updated" // 默认时间倒序
+            val ordering = when (order) {
+                SortOrder.UPDATED -> "-datetime_updated"
+                SortOrder.UPDATED_ASC -> "datetime_updated"
+                SortOrder.POPULARITY -> "-popular"
+                SortOrder.POPULARITY_ASC -> "popular"
+                else -> "-datetime_updated"
+            }
             val top = when {
                 MangaState.FINISHED in filter.states -> "finish"
                 MangaState.ONGOING in filter.states -> "-全部"

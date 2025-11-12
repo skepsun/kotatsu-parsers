@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers.site.heancms.pt
+package org.skepsun.kototoro.parsers.site.heancms.pt
 
-import org.koitharu.kotatsu.parsers.Broken
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.heancms.HeanCms
+import org.skepsun.kototoro.parsers.Broken
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.heancms.HeanCms
 
 @Broken
 @MangaSourceParser("MODESCANLATOR", "ModeScanlator", "pt")

@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.network
+package org.skepsun.kototoro.parsers.network
 
 import okhttp3.Headers
 import okhttp3.HttpUrl

@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers.site.fuzzydoodle.fr
+package org.skepsun.kototoro.parsers.site.fuzzydoodle.fr
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.MangaState
-import org.koitharu.kotatsu.parsers.site.fuzzydoodle.FuzzyDoodleParser
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.MangaState
+import org.skepsun.kototoro.parsers.site.fuzzydoodle.FuzzyDoodleParser
 import java.util.*
 
 @MangaSourceParser("LELSCANVF", "LelScanFr", "fr")

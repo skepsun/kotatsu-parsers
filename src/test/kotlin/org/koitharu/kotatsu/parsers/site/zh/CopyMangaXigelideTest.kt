@@ -1,12 +1,12 @@
-package org.koitharu.kotatsu.parsers.site.zh
+package org.skepsun.kototoro.parsers.site.zh
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.koitharu.kotatsu.parsers.MangaLoaderContextMock
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.test_util.isDistinctBy
-import org.koitharu.kotatsu.test_util.isUrlAbsolute
+import org.skepsun.kototoro.parsers.MangaLoaderContextMock
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.test_util.isDistinctBy
+import org.skepsun.kototoro.test_util.isUrlAbsolute
 import kotlin.time.Duration.Companion.minutes
 
 class CopyMangaXigelideTest {

@@ -1,12 +1,12 @@
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.nodes.Element
-import org.koitharu.kotatsu.parsers.model.Favicon
-import org.koitharu.kotatsu.parsers.model.Favicons
-import org.koitharu.kotatsu.parsers.network.WebClient
-import org.koitharu.kotatsu.parsers.util.json.mapJSON
+import org.skepsun.kototoro.parsers.model.Favicon
+import org.skepsun.kototoro.parsers.model.Favicons
+import org.skepsun.kototoro.parsers.network.WebClient
+import org.skepsun.kototoro.parsers.util.json.mapJSON
 
 public class FaviconParser(
 	private val webClient: WebClient,

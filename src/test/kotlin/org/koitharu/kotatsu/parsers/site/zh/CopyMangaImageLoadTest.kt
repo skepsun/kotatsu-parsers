@@ -1,16 +1,16 @@
-package org.koitharu.kotatsu.parsers.site.zh
+package org.skepsun.kototoro.parsers.site.zh
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.koitharu.kotatsu.parsers.MangaLoaderContextMock
-import org.koitharu.kotatsu.parsers.model.Manga
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.model.RATING_UNKNOWN
-import org.koitharu.kotatsu.parsers.network.OkHttpWebClient
-import org.koitharu.kotatsu.parsers.util.toAbsoluteUrl
-import org.koitharu.kotatsu.parsers.util.parseRaw
-import org.koitharu.kotatsu.test_util.isUrlAbsolute
+import org.skepsun.kototoro.parsers.MangaLoaderContextMock
+import org.skepsun.kototoro.parsers.model.Manga
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.model.RATING_UNKNOWN
+import org.skepsun.kototoro.parsers.network.OkHttpWebClient
+import org.skepsun.kototoro.parsers.util.toAbsoluteUrl
+import org.skepsun.kototoro.parsers.util.parseRaw
+import org.skepsun.kototoro.test_util.isUrlAbsolute
 import kotlin.math.min
 import kotlin.time.Duration.Companion.minutes
 
@@ -69,7 +69,7 @@ class CopyMangaImageLoadTest {
 
             // 构造临时 Page 列表以与下游逻辑一致
             urls.take(5).mapIndexed { i, u ->
-                org.koitharu.kotatsu.parsers.model.MangaPage(
+                org.skepsun.kototoro.parsers.model.MangaPage(
                     id = i.toLong(),
                     url = u,
                     preview = null,

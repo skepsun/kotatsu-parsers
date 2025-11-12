@@ -1,6 +1,6 @@
 # Contributing
 
-The following is a guide for creating Kotatsu parsers. Thanks for taking the time to contribute!
+The following is a guide for creating Kototoro parsers. Thanks for taking the time to contribute!
 
 ## Prerequisites
 
@@ -16,12 +16,12 @@ Before you start, please note that the ability to use the following technologies
 - [IntelliJ IDEA](https://www.jetbrains.com/idea/) (Community edition is enough)
 - Android device (or emulator)
 
-Kotatsu parsers are not a part of the Android application, but you can easily develop and test it directly inside an
+Kototoro parsers are not a part of the Android application, but you can easily develop and test it directly inside an
 Android application project and relocate it to the library project when done.
 
 ### Before you start
 
-First, take a look at the `kotatsu-parsers` project structure. Each parser is a single class that
+First, take a look at the `kototoro-parsers` project structure. Each parser is a single class that
 extends the `MangaParser` class and has a `MangaSourceParser` annotation.
 Also, pay attention to extensions in the `util` package. For example, extensions from the `Jsoup` file
 should be used instead of existing JSoup functions because they have better nullability support
@@ -35,11 +35,11 @@ If it does not contain any documentation about
 API, [explore network requests](https://firefox-source-docs.mozilla.org/devtools-user/):
 some websites use AJAX.
 
-- [Example](https://github.com/KotatsuApp/kotatsu-parsers/blob/master/src/main/kotlin/org/koitharu/kotatsu/parsers/site/ru/DesuMeParser.kt)
+- [Example](https://github.com/KototoroApp/kototoro-parsers/blob/master/src/main/kotlin/org/skepsun/kototoro/parsers/site/ru/DesuMeParser.kt)
   of Json API usage.
-- [Example](https://github.com/KotatsuApp/kotatsu-parsers/blob/master/src/main/kotlin/org/koitharu/kotatsu/parsers/site/be/AnibelParser.kt)
+- [Example](https://github.com/KototoroApp/kototoro-parsers/blob/master/src/main/kotlin/org/skepsun/kototoro/parsers/site/be/AnibelParser.kt)
   of GraphQL API usage
-- [Example](https://github.com/KotatsuApp/kotatsu-parsers/blob/master/src/main/kotlin/org/koitharu/kotatsu/parsers/site/en/MangaTownParser.kt)
+- [Example](https://github.com/KototoroApp/kototoro-parsers/blob/master/src/main/kotlin/org/skepsun/kototoro/parsers/site/en/MangaTownParser.kt)
   of pure HTML parsing.
 
 If the website is based on some engine it is rationally to use a common base class for this one (for example, Madara
@@ -75,10 +75,10 @@ All members of the `MangaParser` class are documented. Pay attention to some pec
 ## Development process
 
 During the development, it is recommended (but not necessary) to write it directly
-in the Kotatsu Android application project. You can use the `core.parser.DummyParser` class as a sandbox. The `Dummy`
-manga source is available in the debug Kotatsu build.
+in the Kototoro Android application project. You can use the `core.parser.DummyParser` class as a sandbox. The `Dummy`
+manga source is available in the debug Kototoro build.
 
-Once the parser is ready you can relocate your code into the `kotatsu-parsers` library project in a `site` package and
+Once the parser is ready you can relocate your code into the `kototoro-parsers` library project in a `site` package and
 create a Pull Request.
 
 ### Testing
@@ -87,10 +87,10 @@ It is recommended that unit tests be run before submitting a PR.
 
 - Temporary modify the `MangaSources` annotation class: specify your parser(s) name(s) and change mode
   to `EnumSource.Mode.INCLUDE`
-- Run the `MangaParserTest` (`gradlew :test --tests "org.koitharu.kotatsu.parsers.MangaParserTest"`)
+- Run the `MangaParserTest` (`gradlew :test --tests "org.skepsun.kototoro.parsers.MangaParserTest"`)
 - Optionally, you can run the `generateTestsReport` gradle task to get a pretty readable html report from test results.
 
 ## Help
 
-If you need help or have some questions, ask a community in our [Telegram chat](https://t.me/kotatsuapp)
+If you need help or have some questions, ask a community in our [Telegram chat](https://t.me/kototoroapp)
 or [Discord server](https://discord.gg/NNJ5RgVBC5).

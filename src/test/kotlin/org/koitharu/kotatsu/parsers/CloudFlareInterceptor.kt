@@ -1,9 +1,9 @@
-package org.koitharu.kotatsu.parsers
+package org.skepsun.kototoro.parsers
 
 import okhttp3.Interceptor
 import okhttp3.Response
 import okhttp3.internal.closeQuietly
-import org.koitharu.kotatsu.parsers.network.CloudFlareHelper
+import org.skepsun.kototoro.parsers.network.CloudFlareHelper
 
 internal class CloudFlareInterceptor : Interceptor {
 

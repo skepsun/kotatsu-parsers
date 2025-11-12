@@ -1,6 +1,6 @@
-package org.koitharu.kotatsu.parsers.model.search
+package org.skepsun.kototoro.parsers.model.search
 
-import org.koitharu.kotatsu.parsers.model.*
+import org.skepsun.kototoro.parsers.model.*
 import java.util.*
 
 /**

@@ -1,9 +1,9 @@
-package org.koitharu.kotatsu.parsers.site.cupfox.fr
+package org.skepsun.kototoro.parsers.site.cupfox.fr
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.MangaParserSource
-import org.koitharu.kotatsu.parsers.site.cupfox.CupFoxParser
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.MangaParserSource
+import org.skepsun.kototoro.parsers.site.cupfox.CupFoxParser
 
 @MangaSourceParser("SEINEMANGA", "SeineManga", "fr")
 internal class SeineManga(context: MangaLoaderContext) :

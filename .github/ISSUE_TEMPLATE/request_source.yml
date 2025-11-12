@@ -1,5 +1,5 @@
 name: 🌐 Source request
-description: Suggest a new source for Kotatsu
+description: Suggest a new source for Kototoro
 labels: [ source request ]
 body:
 
@@ -49,5 +49,5 @@ body:
                     required: true
                 -   label: I have checked that the source does not already exist on the app.
                     required: true
-                -   label: I have checked that the source does not already exist by searching the [GitHub repository](https://github.com/KotatsuApp/kotatsu-parsers) and verified it does not appear in the code base.
+                -   label: I have checked that the source does not already exist by searching the [GitHub repository](https://github.com/KototoroApp/kototoro-parsers) and verified it does not appear in the code base.
                     required: true

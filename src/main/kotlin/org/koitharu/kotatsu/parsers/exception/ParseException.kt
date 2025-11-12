@@ -1,6 +1,6 @@
-package org.koitharu.kotatsu.parsers.exception
+package org.skepsun.kototoro.parsers.exception
 
-import org.koitharu.kotatsu.parsers.InternalParsersApi
+import org.skepsun.kototoro.parsers.InternalParsersApi
 
 public class ParseException @InternalParsersApi @JvmOverloads constructor(
 	public val shortMessage: String?,

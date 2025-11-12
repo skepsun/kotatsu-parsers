@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.bitmap
+package org.skepsun.kototoro.parsers.bitmap
 
 public interface Bitmap {
 

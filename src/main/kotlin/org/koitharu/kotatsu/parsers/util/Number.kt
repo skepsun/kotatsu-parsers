@@ -1,6 +1,6 @@
 @file:JvmName("NumberUtils")
 
-package org.koitharu.kotatsu.parsers.util
+package org.skepsun.kototoro.parsers.util
 
 import java.text.DecimalFormat
 import java.text.NumberFormat

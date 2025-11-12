@@ -1,10 +1,10 @@
-package org.koitharu.kotatsu.parsers.site.madara.id
+package org.skepsun.kototoro.parsers.site.madara.id
 
-import org.koitharu.kotatsu.parsers.MangaLoaderContext
-import org.koitharu.kotatsu.parsers.MangaSourceParser
-import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.site.madara.MadaraParser
-import org.koitharu.kotatsu.parsers.util.*
+import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaSourceParser
+import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.site.madara.MadaraParser
+import org.skepsun.kototoro.parsers.util.*
 import java.util.*
 
 @MangaSourceParser("MANHWAHUB", "ManhwaHub", "id", ContentType.HENTAI)
