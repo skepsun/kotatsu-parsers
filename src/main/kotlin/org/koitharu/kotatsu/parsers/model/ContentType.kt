@@ -21,6 +21,11 @@ public enum class ContentType {
 	 */
 	COMICS,
 
+	/**
+	 * Video content (e.g., anime clips or full videos)
+	 */
+	VIDEO,
+
 	NOVEL,
 
 	/**
