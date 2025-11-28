@@ -33,18 +33,22 @@ public class RelatedMangaFinder(
         }
         val results = words.map { keyword ->
             scope.async {
-                val result = parser.getList(
-                    0,
-                    if (SortOrder.RELEVANCE in parser.availableSortOrders) {
-                        SortOrder.RELEVANCE
-                    } else {
-                        parser.availableSortOrders.first()
-                    },
-                    MangaListFilter(
-                        query = keyword,
-                    ),
-                )
-                result.filter { it.id != seed.id && it.containKeyword(keyword) }
+                try {
+                    val result = parser.getList(
+                        0,
+                        if (SortOrder.RELEVANCE in parser.availableSortOrders) {
+                            SortOrder.RELEVANCE
+                        } else {
+                            parser.availableSortOrders.first()
+                        },
+                        MangaListFilter(
+                            query = keyword,
+                        ),
+                    )
+                    result.filter { it.id != seed.id && it.containKeyword(keyword) }
+                } catch (e: Exception) {
+                    emptyList()
+                }
             }
         }.awaitAll()
         return results.minBy { if (it.isEmpty()) Int.MAX_VALUE else it.size }
