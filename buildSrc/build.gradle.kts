@@ -11,9 +11,10 @@ repositories {
     mavenCentral()
 }
 
-kotlin {
-    jvmToolchain(24)
-}
+// 移除 jvmToolchain 限制，使用系统默认JDK
+// kotlin {
+//     jvmToolchain(24)
+// }
 
 dependencies {
     implementation(libs.korte)
