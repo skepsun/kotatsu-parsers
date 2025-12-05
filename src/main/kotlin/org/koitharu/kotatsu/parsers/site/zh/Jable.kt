@@ -1,6 +1,7 @@
 package org.skepsun.kototoro.parsers.site.en
 
 import org.jsoup.nodes.Document
+import org.skepsun.kototoro.parsers.Broken
 import org.skepsun.kototoro.parsers.MangaLoaderContext
 import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
@@ -8,43 +9,45 @@ import org.skepsun.kototoro.parsers.core.PagedMangaParser
 import org.skepsun.kototoro.parsers.model.*
 import org.skepsun.kototoro.parsers.network.CloudFlareHelper
 import org.skepsun.kototoro.parsers.util.*
-import java.util.Base64
-import java.net.URLDecoder
 import java.util.EnumSet
 
 /**
- * KanAV - 成人视频网站
+ * Jable - 成人视频网站
  * 
- * 网站: https://kanav.ad/
+ * 网站: https://jable.tv/
  * 
  * 技术特点:
- * - 视频URL经过Base64编码和URL编码
- * - 需要解码才能获取真实的m3u8地址
- * - 支持分类浏览和搜索
+ * - 使用 Cloudflare 保护
+ * - 视频 URL 在 JavaScript 变量 hlsUrl 中
+ * - 简单的 m3u8 提取
  * 
- * 分类 (可通过URL直接访问):
- * - 中文字幕: /index.php/vod/type/id/1.html
- * - 日韩有码: /index.php/vod/type/id/2.html
- * - 日韩无码: /index.php/vod/type/id/3.html
- * - 国产AV: /index.php/vod/type/id/4.html
- * - 流出自拍: /index.php/vod/type/id/5.html
- * - 动漫番剧: /index.php/vod/type/id/6.html
+ * 页面结构:
+ * - 最近更新: https://jable.tv/latest-updates/
+ * - 新作发布: https://jable.tv/new-release/
+ * - 女优列表: https://jable.tv/models/
+ * - 具体女优: https://jable.tv/s1/models/{name}/
+ * - 主题列表: https://jable.tv/categories/
+ * - 具体主题: https://jable.tv/categories/{name}/
+ * - 标签作品: https://jable.tv/tags/{name}/
  * 
  * 实现状态:
- * - ✅ 视频列表浏览
- * - ✅ 视频搜索
+ * - ✅ 视频列表解析
  * - ✅ 视频详情解析
- * - ✅ 视频URL提取和解码
- * - ✅ 分类过滤器（6个分类）
+ * - ✅ 视频 URL 提取
+ * - ✅ Cloudflare 处理
+ * - ✅ 搜索功能
+ * - ⚠️ 分类/女优/标签浏览（需要UI支持）
  */
-@MangaSourceParser("KANAV", "KanAV", "en", type = ContentType.VIDEO)
-internal class KanAV(context: MangaLoaderContext) :
-    PagedMangaParser(context, MangaParserSource.KANAV, pageSize = 24) {
+// @Broken("Requires manual Cloudflare Challenge completion on first access")
+@MangaSourceParser("JABLE", "Jable", "zh", type = ContentType.VIDEO)
+internal class Jable(context: MangaLoaderContext) :
+    PagedMangaParser(context, MangaParserSource.JABLE, pageSize = 24) {
 
-    override val configKeyDomain = ConfigKey.Domain("kanav.ad")
+    override val configKeyDomain = ConfigKey.Domain("jable.tv")
 
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.UPDATED,
+        SortOrder.POPULARITY,
     )
 
     override val filterCapabilities: MangaListFilterCapabilities
@@ -56,22 +59,13 @@ internal class KanAV(context: MangaLoaderContext) :
     override suspend fun getFilterOptions(): MangaListFilterOptions {
         return MangaListFilterOptions(
             availableContentTypes = EnumSet.of(ContentType.VIDEO),
-            availableTags = setOf(
-                MangaTag("中文字幕", "1", source),
-                MangaTag("日韩有码", "2", source),
-                MangaTag("日韩无码", "3", source),
-                MangaTag("国产AV", "4", source),
-                MangaTag("流出自拍", "5", source),
-                MangaTag("动漫番剧", "6", source),
-            ),
         )
     }
 
     override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
-        val url = buildListUrl(page, filter)
+        val url = buildListUrl(page, order, filter)
         val response = webClient.httpGet(url, getRequestHeaders())
         
-        // 检查 Cloudflare 保护
         val protection = CloudFlareHelper.checkResponseForProtection(response)
         if (protection != CloudFlareHelper.PROTECTION_NOT_DETECTED) {
             context.requestBrowserAction(this, url)
@@ -81,31 +75,29 @@ internal class KanAV(context: MangaLoaderContext) :
         val items = ArrayList<Manga>(pageSize)
         val seen = LinkedHashSet<String>()
         
-        // 选择器: div.video-item
-        val videoItems = doc.select("div.video-item")
+        // 选择器: div.video-item 或类似结构
+        val videoItems = doc.select("div[class*=video], article[class*=video]")
         
         for (item in videoItems) {
-            // 查找链接
-            val link = item.selectFirst("a[href]") ?: continue
+            val link = item.selectFirst("a[href*=/videos/]") ?: continue
             val href = link.attr("href")
             
             if (href.isBlank()) continue
             
-            // 提取视频ID - 从 /index.php/vod/play/id/95256/sid/1/nid/1.html 提取
-            val idMatch = Regex("""/id/(\d+)/""").find(href)
-            val videoId = idMatch?.groupValues?.get(1) ?: continue
-            
+            val videoId = href.substringAfterLast("/videos/").substringBefore("/")
             if (videoId.isBlank() || !seen.add(videoId)) continue
             
             val img = item.selectFirst("img")
-            val coverUrl = img?.attr("data-original") ?: img?.attr("src") ?: ""
+            val coverUrl = img?.attr("data-src") ?: img?.attr("src") ?: ""
             
-            val title = img?.attr("alt") ?: link.attr("title") ?: videoId
+            val title = img?.attr("alt") ?: link.attr("title") ?: videoId.uppercase()
+            
+            val duration = item.selectFirst("span[class*=duration], div[class*=duration]")?.text()?.trim() ?: ""
             
             items.add(
                 Manga(
                     id = generateUid(videoId),
-                    url = href,
+                    url = "/videos/$videoId/",
                     publicUrl = href.toAbsoluteUrl(domain),
                     title = title,
                     coverUrl = coverUrl,
@@ -116,7 +108,7 @@ internal class KanAV(context: MangaLoaderContext) :
                     state = null,
                     authors = emptySet(),
                     largeCoverUrl = null,
-                    description = null,
+                    description = if (duration.isNotEmpty()) "时长: $duration" else null,
                     chapters = null,
                     source = source,
                 )
@@ -129,7 +121,6 @@ internal class KanAV(context: MangaLoaderContext) :
     override suspend fun getDetails(manga: Manga): Manga {
         val response = webClient.httpGet(manga.publicUrl, getRequestHeaders())
         
-        // 检查 Cloudflare 保护
         val protection = CloudFlareHelper.checkResponseForProtection(response)
         if (protection != CloudFlareHelper.PROTECTION_NOT_DETECTED) {
             context.requestBrowserAction(this, manga.publicUrl)
@@ -138,9 +129,10 @@ internal class KanAV(context: MangaLoaderContext) :
         val doc = response.parseHtml()
         
         // 提取标题
-        val title = doc.selectFirst("h1, .page-title, .video-info-title")?.text()?.trim() ?: manga.title
+        val ogTitle = doc.selectFirst("meta[property=og:title]")?.attr("content")
+        val title = ogTitle ?: doc.selectFirst("h1")?.text() ?: manga.title
         
-        // 提取番号
+        // 提取番号和标题
         val codePattern = Regex("""([A-Z]+(?:-[A-Z]+)*-\d+)""")
         val codeMatch = codePattern.find(title)
         val code = codeMatch?.value ?: ""
@@ -150,7 +142,7 @@ internal class KanAV(context: MangaLoaderContext) :
         val description = if (code.isNotEmpty()) "番號: $code" else null
         
         // 提取标签
-        val tags = doc.select("a[href*=/vod/type/], a[href*=/tag/]").mapNotNullToSet { elem ->
+        val tags = doc.select("a[href*=/tags/], a[href*=/categories/]").mapNotNullToSet { elem ->
             val tagName = elem.text().trim()
             if (tagName.isNotEmpty()) {
                 MangaTag(
@@ -201,7 +193,6 @@ internal class KanAV(context: MangaLoaderContext) :
         val fullUrl = chapter.url.toAbsoluteUrl(domain)
         val response = webClient.httpGet(fullUrl, getRequestHeaders())
         
-        // 检查 Cloudflare 保护
         val protection = CloudFlareHelper.checkResponseForProtection(response)
         if (protection != CloudFlareHelper.PROTECTION_NOT_DETECTED) {
             context.requestBrowserAction(this, fullUrl)
@@ -210,33 +201,29 @@ internal class KanAV(context: MangaLoaderContext) :
         val doc = response.parseHtml()
         val videoUrl = extractVideoUrl(doc) ?: return emptyList()
         
+        val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
+        
         return listOf(
             MangaPage(
                 id = generateUid(videoUrl),
                 url = videoUrl,
-                preview = null,
+                preview = poster,
                 source = source,
             ),
         )
     }
     
-    private fun buildListUrl(page: Int, filter: MangaListFilter): String {
+    private fun buildListUrl(page: Int, order: SortOrder, filter: MangaListFilter): String {
         val base = StringBuilder("https://").append(domain)
         
         if (!filter.query.isNullOrBlank()) {
             // 搜索
-            base.append("/index.php/vod/search.html?wd=").append(filter.query)
-            base.append("&by=time_add")
-            if (page > 1) base.append("&page=").append(page)
-        } else if (filter.tags.isNotEmpty()) {
-            // 分类浏览
-            val tag = filter.tags.first()
-            base.append("/index.php/vod/type/id/").append(tag.key).append(".html")
+            base.append("/search/").append(filter.query).append("/")
             if (page > 1) base.append("?page=").append(page)
         } else {
-            // 主页 - 显示所有视频
-            base.append("/")
-            if (page > 1) base.append("?page=").append(page)
+            // 默认使用最近更新页面
+            base.append("/latest-updates/")
+            if (page > 1) base.append(page).append("/")
         }
         
         return base.toString()
@@ -245,22 +232,11 @@ internal class KanAV(context: MangaLoaderContext) :
     private fun extractVideoUrl(doc: Document): String? {
         val html = doc.outerHtml()
         
-        // 策略 1: 从 JSON 中提取编码的 URL
-        val urlPattern = Regex(""""url"\s*:\s*"([A-Za-z0-9+/=]+)"""")
-        val urlMatch = urlPattern.find(html)
-        
-        if (urlMatch != null) {
-            try {
-                val encodedUrl = urlMatch.groupValues[1]
-                // Base64 解码
-                val decodedBytes = Base64.getDecoder().decode(encodedUrl)
-                val decodedStr = String(decodedBytes, Charsets.UTF_8)
-                // URL 解码
-                val finalUrl = URLDecoder.decode(decodedStr, "UTF-8")
-                return finalUrl
-            } catch (e: Exception) {
-                // 解码失败，继续尝试其他策略
-            }
+        // 策略 1: 从 JavaScript 变量 hlsUrl 提取
+        val hlsPattern = Regex("""var\s+hlsUrl\s*=\s*['"]([^'"]+)['"]""")
+        val hlsMatch = hlsPattern.find(html)
+        if (hlsMatch != null) {
+            return hlsMatch.groupValues[1]
         }
         
         // 策略 2: 直接查找 m3u8 URL

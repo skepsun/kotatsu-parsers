@@ -57,7 +57,7 @@ import java.util.EnumSet
  * - 视频 URL 可能有时效性
  */
 // @Broken("Requires manual Cloudflare Challenge completion on first access")
-@MangaSourceParser("MISSAV", "MissAV", "zh", type = ContentType.VIDEO)
+@MangaSourceParser("MISSAV", "MissAV", type = ContentType.VIDEO)
 internal class MissAV(context: MangaLoaderContext) :
     PagedMangaParser(context, MangaParserSource.MISSAV, pageSize = 24) {
 

@@ -6,81 +6,85 @@ import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedMangaParser
 import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.network.CloudFlareHelper
 import org.skepsun.kototoro.parsers.util.*
+import java.util.Base64
+import java.net.URLDecoder
 import java.util.EnumSet
 
 /**
- * HohoJ - 成人视频网站
+ * KanAV - 成人视频网站
  * 
- * 网站: https://hohoj.tv/
+ * 网站: https://kanav.ad/
  * 
  * 技术特点:
- * - 视频URL在JavaScript变量videoSrc中
- * - 简单的m3u8提取
- * - 支持分类和多种排序方式
+ * - 视频URL经过Base64编码和URL编码
+ * - 需要解码才能获取真实的m3u8地址
+ * - 支持分类浏览和搜索
  * 
- * 分类 (type) - 可通过URL参数指定:
- * - all: 全部 (默认)
- * - censored: 有码
- * - chinese: 中文字幕
- * - uncensored: 无码
- * - europe: 欧美
- * 
- * URL示例:
- * - 全部-最新: /search?type=all&order=latest&p=1
- * - 中文字幕-热门: /search?type=chinese&order=popular&p=1
- * 
- * 注意: 当前实现使用type=all，分类浏览需要在URL中指定
- * 
- * 排序 (order):
- * - latest: 最新 (UPDATED)
- * - popular: 热门 (POPULARITY)
- * - likes: 点赞 (RATING)
- * - views: 播放量 (暂不支持)
+ * 分类 (可通过URL直接访问):
+ * - 中文字幕: /index.php/vod/type/id/1.html
+ * - 日韩有码: /index.php/vod/type/id/2.html
+ * - 日韩无码: /index.php/vod/type/id/3.html
+ * - 国产AV: /index.php/vod/type/id/4.html
+ * - 流出自拍: /index.php/vod/type/id/5.html
+ * - 动漫番剧: /index.php/vod/type/id/6.html
  * 
  * 实现状态:
  * - ✅ 视频列表浏览
  * - ✅ 视频搜索
  * - ✅ 视频详情解析
- * - ✅ 视频URL提取
- * - ✅ 分类支持
- * - ✅ 多种排序
+ * - ✅ 视频URL提取和解码
+ * - ✅ 分类过滤器（6个分类）
  */
-@MangaSourceParser("HOHOJ", "HohoJ", "en", type = ContentType.VIDEO)
-internal class HohoJ(context: MangaLoaderContext) :
-    PagedMangaParser(context, MangaParserSource.HOHOJ, pageSize = 24) {
+@MangaSourceParser("KANAV", "KanAV", "zh", type = ContentType.VIDEO)
+internal class KanAV(context: MangaLoaderContext) :
+    PagedMangaParser(context, MangaParserSource.KANAV, pageSize = 24) {
 
-    override val configKeyDomain = ConfigKey.Domain("hohoj.tv")
+    override val configKeyDomain = ConfigKey.Domain("kanav.ad")
 
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.UPDATED,
-        SortOrder.POPULARITY,
-        SortOrder.RATING,
     )
 
     override val filterCapabilities: MangaListFilterCapabilities
         get() = MangaListFilterCapabilities(
             isSearchSupported = true,
             isMultipleTagsSupported = false,
-            isTagsExclusionSupported = false,
         )
 
     override suspend fun getFilterOptions(): MangaListFilterOptions {
         return MangaListFilterOptions(
-            availableTags = setOf(
-                MangaTag(key = "all", title = "全部", source = source),
-                MangaTag(key = "censored", title = "有码", source = source),
-                MangaTag(key = "chinese", title = "中文字幕", source = source),
-                MangaTag(key = "uncensored", title = "无码", source = source),
-                MangaTag(key = "europe", title = "欧美", source = source),
-            ),
             availableContentTypes = EnumSet.of(ContentType.VIDEO),
+            availableTags = setOf(
+                MangaTag("中文字幕", "1", source),
+                MangaTag("日韩有码", "2", source),
+                MangaTag("日韩无码", "3", source),
+                MangaTag("国产AV", "4", source),
+                MangaTag("流出自拍", "22", source),
+                MangaTag("自拍泄密", "30", source),
+                MangaTag("探花约炮", "31", source),
+                MangaTag("主播泄密", "32", source),
+                MangaTag("动漫番剧", "20", source),
+                MangaTag("里番", "25", source),
+                MangaTag("泡面番", "26", source),
+                MangaTag("Motion Anime", "27", source),
+                MangaTag("3D动画", "28", source),
+                MangaTag("同人作品", "29", source),
+            ),
         )
     }
 
     override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
-        val url = buildListUrl(page, order, filter)
+        val url = buildListUrl(page, filter)
         val response = webClient.httpGet(url, getRequestHeaders())
+        
+        // 检查 Cloudflare 保护
+        val protection = CloudFlareHelper.checkResponseForProtection(response)
+        if (protection != CloudFlareHelper.PROTECTION_NOT_DETECTED) {
+            context.requestBrowserAction(this, url)
+        }
+        
         val doc = response.parseHtml()
         val items = ArrayList<Manga>(pageSize)
         val seen = LinkedHashSet<String>()
@@ -89,27 +93,28 @@ internal class HohoJ(context: MangaLoaderContext) :
         val videoItems = doc.select("div.video-item")
         
         for (item in videoItems) {
+            // 查找链接
             val link = item.selectFirst("a[href]") ?: continue
             val href = link.attr("href")
             
             if (href.isBlank()) continue
             
-            // 提取视频ID - 从 /video?id=3400 格式提取
-            val videoIdMatch = Regex("""[?&]id=(\d+)""").find(href)
-            val videoId = videoIdMatch?.groupValues?.get(1) ?: continue
+            // 提取视频ID - 从 /index.php/vod/play/id/95256/sid/1/nid/1.html 提取
+            val idMatch = Regex("""/id/(\d+)/""").find(href)
+            val videoId = idMatch?.groupValues?.get(1) ?: continue
             
             if (videoId.isBlank() || !seen.add(videoId)) continue
             
             val img = item.selectFirst("img")
-            val coverUrl = img?.attr("src") ?: img?.attr("data-src") ?: ""
+            val coverUrl = img?.attr("data-original") ?: img?.attr("src") ?: ""
             
-            val title = img?.attr("alt") ?: item.selectFirst("div.video-item-title")?.text()?.trim() ?: videoId
+            val title = img?.attr("alt") ?: link.attr("title") ?: videoId
             
             items.add(
                 Manga(
                     id = generateUid(videoId),
-                    url = "/embed?id=$videoId",
-                    publicUrl = "https://$domain/video?id=$videoId",
+                    url = href,
+                    publicUrl = href.toAbsoluteUrl(domain),
                     title = title,
                     coverUrl = coverUrl,
                     altTitles = emptySet(),
@@ -130,13 +135,18 @@ internal class HohoJ(context: MangaLoaderContext) :
     }
 
     override suspend fun getDetails(manga: Manga): Manga {
-        val videoId = manga.url.substringAfter("id=")
-        val detailUrl = "https://$domain/video?id=$videoId"
-        val response = webClient.httpGet(detailUrl, getRequestHeaders())
+        val response = webClient.httpGet(manga.publicUrl, getRequestHeaders())
+        
+        // 检查 Cloudflare 保护
+        val protection = CloudFlareHelper.checkResponseForProtection(response)
+        if (protection != CloudFlareHelper.PROTECTION_NOT_DETECTED) {
+            context.requestBrowserAction(this, manga.publicUrl)
+        }
+        
         val doc = response.parseHtml()
         
         // 提取标题
-        val title = doc.selectFirst("h1, h2")?.text()?.trim() ?: manga.title
+        val title = doc.selectFirst("h1, .page-title, .video-info-title")?.text()?.trim() ?: manga.title
         
         // 提取番号
         val codePattern = Regex("""([A-Z]+(?:-[A-Z]+)*-\d+)""")
@@ -148,7 +158,7 @@ internal class HohoJ(context: MangaLoaderContext) :
         val description = if (code.isNotEmpty()) "番號: $code" else null
         
         // 提取标签
-        val tags = doc.select("a[href*=/tag/], a[href*=/category/]").mapNotNullToSet { elem ->
+        val tags = doc.select("a[href*=/vod/type/], a[href*=/tag/]").mapNotNullToSet { elem ->
             val tagName = elem.text().trim()
             if (tagName.isNotEmpty()) {
                 MangaTag(
@@ -158,6 +168,9 @@ internal class HohoJ(context: MangaLoaderContext) :
                 )
             } else null
         }
+        
+        // 提取封面
+        val coverUrl = doc.selectFirst("meta[property=og:image]")?.attr("content") ?: manga.coverUrl
         
         // 创建单个章节
         val chapter = MangaChapter(
@@ -175,6 +188,7 @@ internal class HohoJ(context: MangaLoaderContext) :
         return manga.copy(
             title = cleanTitle,
             description = description,
+            coverUrl = coverUrl,
             tags = tags,
             chapters = listOf(chapter),
         )
@@ -192,15 +206,15 @@ internal class HohoJ(context: MangaLoaderContext) :
             )
         }
         
-        val videoId = chapter.url.substringAfter("id=")
-        val embedUrl = "https://$domain/embed?id=$videoId"
-        val referer = "https://$domain/video?id=$videoId"
+        val fullUrl = chapter.url.toAbsoluteUrl(domain)
+        val response = webClient.httpGet(fullUrl, getRequestHeaders())
         
-        val headers = getRequestHeaders().newBuilder()
-            .add("Referer", referer)
-            .build()
+        // 检查 Cloudflare 保护
+        val protection = CloudFlareHelper.checkResponseForProtection(response)
+        if (protection != CloudFlareHelper.PROTECTION_NOT_DETECTED) {
+            context.requestBrowserAction(this, fullUrl)
+        }
         
-        val response = webClient.httpGet(embedUrl, headers)
         val doc = response.parseHtml()
         val videoUrl = extractVideoUrl(doc) ?: return emptyList()
         
@@ -214,31 +228,23 @@ internal class HohoJ(context: MangaLoaderContext) :
         )
     }
     
-    private fun buildListUrl(page: Int, order: SortOrder, filter: MangaListFilter): String {
+    private fun buildListUrl(page: Int, filter: MangaListFilter): String {
         val base = StringBuilder("https://").append(domain)
         
         if (!filter.query.isNullOrBlank()) {
             // 搜索
-            base.append("/search?text=").append(filter.query)
+            base.append("/index.php/vod/search.html?wd=").append(filter.query)
+            base.append("&by=time_add")
             if (page > 1) base.append("&page=").append(page)
+        } else if (filter.tags.isNotEmpty()) {
+            // 分类浏览
+            val tag = filter.tags.first()
+            base.append("/index.php/vod/type/id/").append(tag.key).append(".html")
+            if (page > 1) base.append("?page=").append(page)
         } else {
-            // 分类浏览 - 使用 /search 端点
-            base.append("/search")
-            
-            // 添加类型参数
-            val typeTag = filter.tags.firstOrNull()?.key ?: "all"
-            base.append("?type=").append(typeTag)
-            
-            // 添加排序参数
-            when (order) {
-                SortOrder.UPDATED -> base.append("&order=latest")
-                SortOrder.POPULARITY -> base.append("&order=popular")
-                SortOrder.RATING -> base.append("&order=likes")
-                else -> base.append("&order=latest")
-            }
-            
-            // 添加页码
-            if (page > 1) base.append("&p=").append(page)
+            // 主页 - 显示所有视频
+            base.append("/")
+            if (page > 1) base.append("?page=").append(page)
         }
         
         return base.toString()
@@ -247,11 +253,22 @@ internal class HohoJ(context: MangaLoaderContext) :
     private fun extractVideoUrl(doc: Document): String? {
         val html = doc.outerHtml()
         
-        // 策略 1: 从 JavaScript 变量 videoSrc 提取
-        val videoSrcPattern = Regex("""var\s+videoSrc\s*=\s*['"]([^'"]+)['"]""")
-        val videoSrcMatch = videoSrcPattern.find(html)
-        if (videoSrcMatch != null) {
-            return videoSrcMatch.groupValues[1]
+        // 策略 1: 从 JSON 中提取编码的 URL
+        val urlPattern = Regex(""""url"\s*:\s*"([A-Za-z0-9+/=]+)"""")
+        val urlMatch = urlPattern.find(html)
+        
+        if (urlMatch != null) {
+            try {
+                val encodedUrl = urlMatch.groupValues[1]
+                // Base64 解码
+                val decodedBytes = Base64.getDecoder().decode(encodedUrl)
+                val decodedStr = String(decodedBytes, Charsets.UTF_8)
+                // URL 解码
+                val finalUrl = URLDecoder.decode(decodedStr, "UTF-8")
+                return finalUrl
+            } catch (e: Exception) {
+                // 解码失败，继续尝试其他策略
+            }
         }
         
         // 策略 2: 直接查找 m3u8 URL

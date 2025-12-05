@@ -70,8 +70,10 @@ internal class Cosxplay(context: MangaLoaderContext) :
     override val configKeyDomain = ConfigKey.Domain("cosxplay.com")
 
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
-        SortOrder.UPDATED,
-        SortOrder.POPULARITY,
+        SortOrder.UPDATED,      // Newest (latest)
+        SortOrder.POPULARITY,   // Best (popular) - also used for most-viewed
+        SortOrder.RATING,       // Most viewed (most-viewed)
+        SortOrder.ALPHABETICAL, // Longest (longest)
     )
 
     override val filterCapabilities: MangaListFilterCapabilities
@@ -81,7 +83,59 @@ internal class Cosxplay(context: MangaLoaderContext) :
         )
 
     override suspend fun getFilterOptions(): MangaListFilterOptions {
+        val tags = setOf(
+            MangaTag(title = "2B", key = "7841-nier-automata", source = source),
+            MangaTag(title = "ASMR", key = "18231-18321-asmr", source = source),
+            MangaTag(title = "Ahegao", key = "4063-ahegao", source = source),
+            MangaTag(title = "Anal", key = "11104-anal", source = source),
+            MangaTag(title = "Anime", key = "12814-anime", source = source),
+            MangaTag(title = "BBW", key = "19001-bbw", source = source),
+            MangaTag(title = "Big boobs", key = "11117-big-boobs", source = source),
+            MangaTag(title = "Bondage", key = "10570-bondage", source = source),
+            MangaTag(title = "Bunny", key = "8103-bunnies", source = source),
+            MangaTag(title = "Creampie", key = "11113-creampie", source = source),
+            MangaTag(title = "D.va", key = "95-overwatch", source = source),
+            MangaTag(title = "Dildo", key = "11118-dildo", source = source),
+            MangaTag(title = "Feet", key = "17809-feet", source = source),
+            MangaTag(title = "Femboy", key = "71061-femboy", source = source),
+            MangaTag(title = "Furry", key = "16652-furry", source = source),
+            MangaTag(title = "Genshin", key = "70946-genshin-impact", source = source),
+            MangaTag(title = "Halloween", key = "17220-halloween", source = source),
+            MangaTag(title = "Harley Quinn", key = "7776-harley-quinn", source = source),
+            MangaTag(title = "Hinata", key = "7828-naruto/12508-hinata", source = source),
+            MangaTag(title = "JOI", key = "11121-joi", source = source),
+            MangaTag(title = "Japanese", key = "11115-asian/12547-japanese", source = source),
+            MangaTag(title = "Jinx", key = "61118-jinx", source = source),
+            MangaTag(title = "Kigurumi", key = "5231-kigurumi", source = source),
+            MangaTag(title = "Latex", key = "5230-latex", source = source),
+            MangaTag(title = "Lesbian", key = "11114-lesbian", source = source),
+            MangaTag(title = "Maid", key = "19621-uniform/13908-maid", source = source),
+            MangaTag(title = "Makima", key = "73136-makima", source = source),
+            MangaTag(title = "Masturbation", key = "17807-masturbation", source = source),
+            MangaTag(title = "Naruto", key = "7828-naruto", source = source),
+            MangaTag(title = "Neko", key = "11101-neko-porn", source = source),
+            MangaTag(title = "Nezuko", key = "12814-anime/59215-nezuko", source = source),
+            MangaTag(title = "Nun", key = "17862-nun", source = source),
+            MangaTag(title = "Nurse", key = "19621-uniform/13154-nurse", source = source),
+            MangaTag(title = "One Piece", key = "12814-anime/70920-one-piece", source = source),
+            MangaTag(title = "POV", key = "11119-pov", source = source),
+            MangaTag(title = "Poison Ivy", key = "7881-poison-ivy", source = source),
+            MangaTag(title = "Pokemon", key = "2166-pokemon", source = source),
+            MangaTag(title = "Public", key = "17216-public", source = source),
+            MangaTag(title = "Rem", key = "20911-rem-ram", source = source),
+            MangaTag(title = "Sakura", key = "7828-naruto/21040-sakura-haruno", source = source),
+            MangaTag(title = "Solo", key = "16982-solo", source = source),
+            MangaTag(title = "Succubus", key = "7837-creatures/7833-succubus", source = source),
+            MangaTag(title = "Supergirl", key = "2101-supergirl", source = source),
+            MangaTag(title = "Superheroines", key = "17328-superheroines", source = source),
+            MangaTag(title = "Teen", key = "11120-teen", source = source),
+            MangaTag(title = "Tsunade", key = "61046-tsunade", source = source),
+            MangaTag(title = "Velma", key = "7832-films/7835-scooby-doo/11125-velma", source = source),
+            MangaTag(title = "Wonder Woman", key = "922-wonderwoman", source = source),
+        )
+        
         return MangaListFilterOptions(
+            availableTags = tags,
             availableContentTypes = EnumSet.of(ContentType.VIDEO),
         )
     }
@@ -157,6 +211,7 @@ internal class Cosxplay(context: MangaLoaderContext) :
         val metaDesc = doc.selectFirst("meta[property=og:description]")?.attr("content")
         val metaImage = doc.selectFirst("meta[property=og:image]")?.attr("content")
         
+        // html中的标签示例<a href="https://cosxplay.com/70946-genshin-impact/" class="label-cat ppopp" title="Genshin">Genshin</a>
         // 提取标签
         val tags = doc.select(".tags a").mapNotNull { tag ->
             val tagText = tag.text().trim()
@@ -169,13 +224,12 @@ internal class Cosxplay(context: MangaLoaderContext) :
             } else null
         }.toSet()
         
-        // 提取视频播放 URL
-        val videoUrl = extractVideoUrl(doc)
-        
         // 创建单个章节（视频）
+        // 注意：chapter.url 使用详情页 URL，而不是视频 URL
+        // 这样在 getPages 中可以总是获取最新的视频 URL，避免 URL 过期问题
         val chapter = MangaChapter(
             id = generateUid("${manga.url}|video"),
-            url = videoUrl ?: manga.url,
+            url = manga.url,  // 使用详情页 URL
             title = "Watch",
             number = 1f,
             uploadDate = 0L,
@@ -195,19 +249,8 @@ internal class Cosxplay(context: MangaLoaderContext) :
     }
 
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
-        // 如果 chapter.url 已经是视频 URL，直接返回
-        if (chapter.url.contains(".mp4")) {
-            return listOf(
-                MangaPage(
-                    id = generateUid(chapter.url),
-                    url = chapter.url,
-                    preview = null,
-                    source = source,
-                ),
-            )
-        }
-        
-        // 否则需要重新获取详情页
+        // 总是从详情页获取最新的视频 URL
+        // 这样可以避免视频 URL 过期的问题（URL 包含 verify 参数）
         val response = webClient.httpGet(chapter.url.toAbsoluteUrl(domain), getRequestHeaders())
         
         val protection = CloudFlareHelper.checkResponseForProtection(response)
@@ -232,16 +275,48 @@ internal class Cosxplay(context: MangaLoaderContext) :
     private fun buildListUrl(page: Int, order: SortOrder, filter: MangaListFilter): String {
         val base = StringBuilder("https://").append(domain)
         
+        // 处理搜索
         if (!filter.query.isNullOrBlank()) {
-            base.append("/search")
-            base.append("?q=").append(filter.query)
+            base.append("/?s=").append(filter.query.urlEncoded())
             if (page > 1) base.append("&page=").append(page)
-        } else {
-            base.append("/")
+            return base.toString()
+        }
+        
+        // 处理标签过滤
+        if (filter.tags.isNotEmpty()) {
+            val tag = filter.tags.first()
+            base.append("/").append(tag.key).append("/")
             if (page > 1) base.append("page/").append(page).append("/")
+            
+            // 添加排序参数
+            val sortFilter = getSortFilter(order)
+            if (sortFilter != null) {
+                base.append("?filter=").append(sortFilter)
+            }
+            return base.toString()
+        }
+        
+        // 默认首页
+        base.append("/")
+        if (page > 1) base.append("page/").append(page).append("/")
+        
+        // 添加排序参数
+        val sortFilter = getSortFilter(order)
+        if (sortFilter != null) {
+            base.append("?filter=").append(sortFilter)
         }
         
         return base.toString()
+    }
+    
+    private fun getSortFilter(order: SortOrder): String? {
+        return when (order) {
+            SortOrder.UPDATED -> "latest"
+            SortOrder.RATING -> "most-viewed"
+            SortOrder.POPULARITY -> "popular"
+            SortOrder.ALPHABETICAL -> "longest"  // 使用 ALPHABETICAL 代表 Longest
+            else -> null
+        }
     }
     
     private fun buildDescription(views: String?, rating: String?, duration: String?): String? {

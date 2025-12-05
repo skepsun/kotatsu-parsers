@@ -1,63 +1,79 @@
 package org.skepsun.kototoro.parsers.site.en
 
 import org.jsoup.nodes.Document
-import org.skepsun.kototoro.parsers.Broken
 import org.skepsun.kototoro.parsers.MangaLoaderContext
 import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedMangaParser
 import org.skepsun.kototoro.parsers.model.*
-import org.skepsun.kototoro.parsers.network.CloudFlareHelper
 import org.skepsun.kototoro.parsers.util.*
 import java.util.EnumSet
 
 /**
- * Jable - 成人视频网站
+ * HohoJ - 成人视频网站
  * 
- * 网站: https://jable.tv/
+ * 网站: https://hohoj.tv/
  * 
  * 技术特点:
- * - 使用 Cloudflare 保护
- * - 视频 URL 在 JavaScript 变量 hlsUrl 中
- * - 简单的 m3u8 提取
+ * - 视频URL在JavaScript变量videoSrc中
+ * - 简单的m3u8提取
+ * - 支持分类和多种排序方式
  * 
- * 页面结构:
- * - 最近更新: https://jable.tv/latest-updates/
- * - 新作发布: https://jable.tv/new-release/
- * - 女优列表: https://jable.tv/models/
- * - 具体女优: https://jable.tv/s1/models/{name}/
- * - 主题列表: https://jable.tv/categories/
- * - 具体主题: https://jable.tv/categories/{name}/
- * - 标签作品: https://jable.tv/tags/{name}/
+ * 分类 (type) - 可通过URL参数指定:
+ * - all: 全部 (默认)
+ * - censored: 有码
+ * - chinese: 中文字幕
+ * - uncensored: 无码
+ * - europe: 欧美
+ * 
+ * URL示例:
+ * - 全部-最新: /search?type=all&order=latest&p=1
+ * - 中文字幕-热门: /search?type=chinese&order=popular&p=1
+ * 
+ * 注意: 当前实现使用type=all，分类浏览需要在URL中指定
+ * 
+ * 排序 (order):
+ * - latest: 最新 (UPDATED)
+ * - popular: 热门 (POPULARITY)
+ * - likes: 点赞 (RATING)
+ * - views: 播放量 (暂不支持)
  * 
  * 实现状态:
- * - ✅ 视频列表解析
+ * - ✅ 视频列表浏览
+ * - ✅ 视频搜索
  * - ✅ 视频详情解析
- * - ✅ 视频 URL 提取
- * - ✅ Cloudflare 处理
- * - ✅ 搜索功能
- * - ⚠️ 分类/女优/标签浏览（需要UI支持）
+ * - ✅ 视频URL提取
+ * - ✅ 分类支持
+ * - ✅ 多种排序
  */
-// @Broken("Requires manual Cloudflare Challenge completion on first access")
-@MangaSourceParser("JABLE", "Jable", "en", type = ContentType.VIDEO)
-internal class Jable(context: MangaLoaderContext) :
-    PagedMangaParser(context, MangaParserSource.JABLE, pageSize = 24) {
+@MangaSourceParser("HOHOJ", "HohoJ", "zh", type = ContentType.VIDEO)
+internal class HohoJ(context: MangaLoaderContext) :
+    PagedMangaParser(context, MangaParserSource.HOHOJ, pageSize = 24) {
 
-    override val configKeyDomain = ConfigKey.Domain("jable.tv")
+    override val configKeyDomain = ConfigKey.Domain("hohoj.tv")
 
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.UPDATED,
         SortOrder.POPULARITY,
+        SortOrder.RATING,
     )
 
     override val filterCapabilities: MangaListFilterCapabilities
         get() = MangaListFilterCapabilities(
             isSearchSupported = true,
             isMultipleTagsSupported = false,
+            isTagsExclusionSupported = false,
         )
 
     override suspend fun getFilterOptions(): MangaListFilterOptions {
         return MangaListFilterOptions(
+            availableTags = setOf(
+                MangaTag(key = "all", title = "全部", source = source),
+                MangaTag(key = "censored", title = "有码", source = source),
+                MangaTag(key = "chinese", title = "中文字幕", source = source),
+                MangaTag(key = "uncensored", title = "无码", source = source),
+                MangaTag(key = "europe", title = "欧美", source = source),
+            ),
             availableContentTypes = EnumSet.of(ContentType.VIDEO),
         )
     }
@@ -65,40 +81,35 @@ internal class Jable(context: MangaLoaderContext) :
     override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
         val url = buildListUrl(page, order, filter)
         val response = webClient.httpGet(url, getRequestHeaders())
-        
-        val protection = CloudFlareHelper.checkResponseForProtection(response)
-        if (protection != CloudFlareHelper.PROTECTION_NOT_DETECTED) {
-            context.requestBrowserAction(this, url)
-        }
-        
         val doc = response.parseHtml()
         val items = ArrayList<Manga>(pageSize)
         val seen = LinkedHashSet<String>()
         
-        // 选择器: div.video-item 或类似结构
-        val videoItems = doc.select("div[class*=video], article[class*=video]")
+        // 选择器: div.video-item
+        val videoItems = doc.select("div.video-item")
         
         for (item in videoItems) {
-            val link = item.selectFirst("a[href*=/videos/]") ?: continue
+            val link = item.selectFirst("a[href]") ?: continue
             val href = link.attr("href")
             
             if (href.isBlank()) continue
             
-            val videoId = href.substringAfterLast("/videos/").substringBefore("/")
+            // 提取视频ID - 从 /video?id=3400 格式提取
+            val videoIdMatch = Regex("""[?&]id=(\d+)""").find(href)
+            val videoId = videoIdMatch?.groupValues?.get(1) ?: continue
+            
             if (videoId.isBlank() || !seen.add(videoId)) continue
             
             val img = item.selectFirst("img")
-            val coverUrl = img?.attr("data-src") ?: img?.attr("src") ?: ""
+            val coverUrl = img?.attr("src") ?: img?.attr("data-src") ?: ""
             
-            val title = img?.attr("alt") ?: link.attr("title") ?: videoId.uppercase()
-            
-            val duration = item.selectFirst("span[class*=duration], div[class*=duration]")?.text()?.trim() ?: ""
+            val title = img?.attr("alt") ?: item.selectFirst("div.video-item-title")?.text()?.trim() ?: videoId
             
             items.add(
                 Manga(
                     id = generateUid(videoId),
-                    url = "/videos/$videoId/",
-                    publicUrl = href.toAbsoluteUrl(domain),
+                    url = "/embed?id=$videoId",
+                    publicUrl = "https://$domain/video?id=$videoId",
                     title = title,
                     coverUrl = coverUrl,
                     altTitles = emptySet(),
@@ -108,7 +119,7 @@ internal class Jable(context: MangaLoaderContext) :
                     state = null,
                     authors = emptySet(),
                     largeCoverUrl = null,
-                    description = if (duration.isNotEmpty()) "时长: $duration" else null,
+                    description = null,
                     chapters = null,
                     source = source,
                 )
@@ -119,20 +130,15 @@ internal class Jable(context: MangaLoaderContext) :
     }
 
     override suspend fun getDetails(manga: Manga): Manga {
-        val response = webClient.httpGet(manga.publicUrl, getRequestHeaders())
-        
-        val protection = CloudFlareHelper.checkResponseForProtection(response)
-        if (protection != CloudFlareHelper.PROTECTION_NOT_DETECTED) {
-            context.requestBrowserAction(this, manga.publicUrl)
-        }
-        
+        val videoId = manga.url.substringAfter("id=")
+        val detailUrl = "https://$domain/video?id=$videoId"
+        val response = webClient.httpGet(detailUrl, getRequestHeaders())
         val doc = response.parseHtml()
         
         // 提取标题
-        val ogTitle = doc.selectFirst("meta[property=og:title]")?.attr("content")
-        val title = ogTitle ?: doc.selectFirst("h1")?.text() ?: manga.title
+        val title = doc.selectFirst("h1, h2")?.text()?.trim() ?: manga.title
         
-        // 提取番号和标题
+        // 提取番号
         val codePattern = Regex("""([A-Z]+(?:-[A-Z]+)*-\d+)""")
         val codeMatch = codePattern.find(title)
         val code = codeMatch?.value ?: ""
@@ -142,7 +148,7 @@ internal class Jable(context: MangaLoaderContext) :
         val description = if (code.isNotEmpty()) "番號: $code" else null
         
         // 提取标签
-        val tags = doc.select("a[href*=/tags/], a[href*=/categories/]").mapNotNullToSet { elem ->
+        val tags = doc.select("a[href*=/tag/], a[href*=/category/]").mapNotNullToSet { elem ->
             val tagName = elem.text().trim()
             if (tagName.isNotEmpty()) {
                 MangaTag(
@@ -152,9 +158,6 @@ internal class Jable(context: MangaLoaderContext) :
                 )
             } else null
         }
-        
-        // 提取封面
-        val coverUrl = doc.selectFirst("meta[property=og:image]")?.attr("content") ?: manga.coverUrl
         
         // 创建单个章节
         val chapter = MangaChapter(
@@ -172,7 +175,6 @@ internal class Jable(context: MangaLoaderContext) :
         return manga.copy(
             title = cleanTitle,
             description = description,
-            coverUrl = coverUrl,
             tags = tags,
             chapters = listOf(chapter),
         )
@@ -190,24 +192,23 @@ internal class Jable(context: MangaLoaderContext) :
             )
         }
         
-        val fullUrl = chapter.url.toAbsoluteUrl(domain)
-        val response = webClient.httpGet(fullUrl, getRequestHeaders())
+        val videoId = chapter.url.substringAfter("id=")
+        val embedUrl = "https://$domain/embed?id=$videoId"
+        val referer = "https://$domain/video?id=$videoId"
         
-        val protection = CloudFlareHelper.checkResponseForProtection(response)
-        if (protection != CloudFlareHelper.PROTECTION_NOT_DETECTED) {
-            context.requestBrowserAction(this, fullUrl)
-        }
+        val headers = getRequestHeaders().newBuilder()
+            .add("Referer", referer)
+            .build()
         
+        val response = webClient.httpGet(embedUrl, headers)
         val doc = response.parseHtml()
         val videoUrl = extractVideoUrl(doc) ?: return emptyList()
-        
-        val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
         
         return listOf(
             MangaPage(
                 id = generateUid(videoUrl),
                 url = videoUrl,
-                preview = poster,
+                preview = null,
                 source = source,
             ),
         )
@@ -218,12 +219,26 @@ internal class Jable(context: MangaLoaderContext) :
         
         if (!filter.query.isNullOrBlank()) {
             // 搜索
-            base.append("/search/").append(filter.query).append("/")
-            if (page > 1) base.append("?page=").append(page)
+            base.append("/search?text=").append(filter.query)
+            if (page > 1) base.append("&page=").append(page)
         } else {
-            // 默认使用最近更新页面
-            base.append("/latest-updates/")
-            if (page > 1) base.append(page).append("/")
+            // 分类浏览 - 使用 /search 端点
+            base.append("/search")
+            
+            // 添加类型参数
+            val typeTag = filter.tags.firstOrNull()?.key ?: "all"
+            base.append("?type=").append(typeTag)
+            
+            // 添加排序参数
+            when (order) {
+                SortOrder.UPDATED -> base.append("&order=latest")
+                SortOrder.POPULARITY -> base.append("&order=popular")
+                SortOrder.RATING -> base.append("&order=likes")
+                else -> base.append("&order=latest")
+            }
+            
+            // 添加页码
+            if (page > 1) base.append("&p=").append(page)
         }
         
         return base.toString()
@@ -232,11 +247,11 @@ internal class Jable(context: MangaLoaderContext) :
     private fun extractVideoUrl(doc: Document): String? {
         val html = doc.outerHtml()
         
-        // 策略 1: 从 JavaScript 变量 hlsUrl 提取
-        val hlsPattern = Regex("""var\s+hlsUrl\s*=\s*['"]([^'"]+)['"]""")
-        val hlsMatch = hlsPattern.find(html)
-        if (hlsMatch != null) {
-            return hlsMatch.groupValues[1]
+        // 策略 1: 从 JavaScript 变量 videoSrc 提取
+        val videoSrcPattern = Regex("""var\s+videoSrc\s*=\s*['"]([^'"]+)['"]""")
+        val videoSrcMatch = videoSrcPattern.find(html)
+        if (videoSrcMatch != null) {
+            return videoSrcMatch.groupValues[1]
         }
         
         // 策略 2: 直接查找 m3u8 URL

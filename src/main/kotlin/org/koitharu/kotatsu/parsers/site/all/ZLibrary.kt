@@ -40,7 +40,7 @@ import java.util.EnumSet
  * - ✅ 多语言支持
  * - ✅ 格式筛选
  */
-@MangaSourceParser("ZLIBRARY", "Z-Library", "en", type = ContentType.NOVEL)
+@MangaSourceParser("ZLIBRARY", "Z-Library", type = ContentType.NOVEL)
 internal class ZLibrary(context: MangaLoaderContext) :
     PagedMangaParser(context, MangaParserSource.ZLIBRARY, pageSize = 50),
     MangaParserAuthProvider {
