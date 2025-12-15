@@ -20,3 +20,11 @@ public data class MangaPage(
 	@JvmField public val preview: String?,
 	@JvmField public val source: MangaSource,
 )
+
+@Deprecated("Use id instead of index", ReplaceWith("MangaPage(index.toLong(), url, previewUrl, source)"))
+public fun MangaPage(index: Int, url: String, previewUrl: String?, source: MangaSource): MangaPage = MangaPage(
+	id = index.toLong(),
+	url = url,
+	preview = previewUrl,
+	source = source,
+)

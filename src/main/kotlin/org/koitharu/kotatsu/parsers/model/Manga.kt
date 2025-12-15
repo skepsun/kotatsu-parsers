@@ -71,6 +71,41 @@ public data class Manga(
 	@JvmField public val source: MangaSource,
 ) {
 
+	@Deprecated("Accepts rating as Int; use Float in range 0..1 instead")
+	public constructor(
+		id: Long,
+		title: String,
+		altTitles: Set<String>,
+		url: String,
+		publicUrl: String,
+		rating: Int,
+		contentRating: ContentRating?,
+		coverUrl: String?,
+		tags: Set<MangaTag>,
+		state: MangaState?,
+		authors: Set<String>,
+		largeCoverUrl: String? = null,
+		description: String? = null,
+		chapters: List<MangaChapter>? = null,
+		source: MangaSource,
+	) : this(
+		id = id,
+		title = title,
+		altTitles = altTitles,
+		url = url,
+		publicUrl = publicUrl,
+		rating = rating.toFloat(),
+		contentRating = contentRating,
+		coverUrl = coverUrl?.nullIfEmpty(),
+		tags = tags,
+		state = state,
+		authors = authors,
+		largeCoverUrl = largeCoverUrl?.nullIfEmpty(),
+		description = description?.nullIfEmpty(),
+		chapters = chapters,
+		source = source,
+	)
+
 	@Deprecated("Use other constructor")
 	public constructor(
 		/**

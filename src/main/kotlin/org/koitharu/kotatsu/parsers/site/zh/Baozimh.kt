@@ -14,7 +14,7 @@ import org.skepsun.kototoro.parsers.util.json.mapJSON
 import org.skepsun.kototoro.parsers.util.suspendlazy.suspendLazy
 import java.util.*
 
-@MangaSourceParser("BAOZIMH", "Baozimh", "zh")
+@MangaSourceParser("BAOZIMH", "包子漫画", "zh")
 internal class Baozimh(context: MangaLoaderContext) :
 	PagedMangaParser(context, MangaParserSource.BAOZIMH, pageSize = 36) {
 

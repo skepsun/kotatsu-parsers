@@ -27,6 +27,8 @@ import java.util.Base64
 import kotlin.random.Random
 import java.util.EnumSet
 
+import org.skepsun.kototoro.parsers.model.MangaTagGroup
+
 /**
  * 拷贝漫画（新站）解析器
  * 参考 /Users/sunchuxiong/kototoro_demo/copymanga.js
@@ -76,6 +78,7 @@ internal class CopyMangaParser(context: MangaLoaderContext) :
     private val imageQuality: String = "1500"
     // 主题分类映射（简化为空，接口将返回全部）
     private val CATEGORY_PARAM_DICT: Map<String, String> = mapOf(
+        "全部" to "",
         // 最小可用映射，用户反馈可正常浏览
         "爱情" to "aiqing",
         "歡樂向" to "huanlexiang",
@@ -175,6 +178,12 @@ internal class CopyMangaParser(context: MangaLoaderContext) :
         }.toSet()
         return MangaListFilterOptions(
             availableTags = themeTags,
+            tagGroups = listOf(
+                MangaTagGroup(
+                    title = "主题",
+                    tags = themeTags,
+                ),
+            ),
             availableStates = EnumSet.of(MangaState.ONGOING, MangaState.FINISHED),
             availableContentRating = emptySet(),
         )

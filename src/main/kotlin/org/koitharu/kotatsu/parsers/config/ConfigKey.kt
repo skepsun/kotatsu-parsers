@@ -18,6 +18,12 @@ public sealed class ConfigKey<T>(
 			get() = presetValues.first()
 	}
 
+	public class Text(
+		key: String,
+		@JvmField public val title: String,
+		override val defaultValue: String = "",
+	) : ConfigKey<String>(key)
+
 	public class ShowSuspiciousContent(
 		override val defaultValue: Boolean,
 	) : ConfigKey<Boolean>("show_suspicious")

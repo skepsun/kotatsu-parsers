@@ -32,8 +32,13 @@ public fun Response.parseHtml(): Document = use { response ->
  * @see [parseHtml]
  */
 public fun Response.parseJson(): JSONObject = use { response ->
-    JSONObject(response.body.string())
+	JSONObject(response.body.string())
 }
+
+/**
+ * Backward-compatible alias for [parseJson].
+ */
+public fun Response.parseJsonObject(): JSONObject = parseJson()
 
 /**
  * Parse [Response] body as [JSONArray]

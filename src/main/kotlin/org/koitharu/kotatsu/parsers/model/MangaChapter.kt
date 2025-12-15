@@ -42,6 +42,30 @@ public data class MangaChapter(
 	@JvmField public val source: MangaSource,
 ) {
 
+	@Deprecated("Use title instead of name", ReplaceWith("MangaChapter(id, title, number, volume, url, scanlator, uploadDate, branch, source)"))
+	public constructor(
+		id: Long,
+		name: String?,
+		number: Float,
+		volume: Int,
+		url: String,
+		scanlator: String?,
+		uploadDate: Long,
+		branch: String?,
+		source: MangaSource,
+		@Suppress("UNUSED_PARAMETER") dummy: Boolean = false,
+	) : this(
+		id = id,
+		title = name,
+		number = number,
+		volume = volume,
+		url = url,
+		scanlator = scanlator,
+		uploadDate = uploadDate,
+		branch = branch,
+		source = source,
+	)
+
 	@Deprecated("Use title instead", ReplaceWith("title"))
 	val name: String
 		get() = title.ifNullOrEmpty {

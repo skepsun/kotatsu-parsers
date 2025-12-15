@@ -110,6 +110,12 @@ internal class KomiicParser(context: MangaLoaderContext) :
         val tags = fetchAvailableTags()
         return MangaListFilterOptions(
             availableTags = tags,
+            tagGroups = listOf(
+                MangaTagGroup(
+                    title = "主题",
+                    tags = tags,
+                ),
+            ),
             availableStates = EnumSet.of(MangaState.ONGOING, MangaState.FINISHED),
             availableContentRating = EnumSet.of(ContentRating.SAFE, ContentRating.SUGGESTIVE, ContentRating.ADULT),
         )
@@ -166,7 +172,9 @@ internal class KomiicParser(context: MangaLoaderContext) :
             }
             list
         } else if (filter.tags.isNotEmpty()) {
-            val categoryIds = filter.tags.map { it.key }.filter { it.matches(Regex("^\\d+")) }
+            val categoryIds = filter.tags
+                .map { it.key }
+                .filter { it.matches(Regex("^\\d+")) && it != "0" }
             if (categoryIds.isNotEmpty()) {
                 listByCategories(
                     categoryIds,
@@ -476,6 +484,7 @@ internal class KomiicParser(context: MangaLoaderContext) :
         if (cached != null) return cached
         // 以站点固定分类为基准（来源于官方前端配置），避免采样不全
         val names = arrayOf(
+            "全部",
             "愛情",
             "神鬼",
             "校園",
@@ -515,6 +524,7 @@ internal class KomiicParser(context: MangaLoaderContext) :
             "黑道",
         )
         val ids = arrayOf(
+            "0",
             "1",
             "3",
             "4",
