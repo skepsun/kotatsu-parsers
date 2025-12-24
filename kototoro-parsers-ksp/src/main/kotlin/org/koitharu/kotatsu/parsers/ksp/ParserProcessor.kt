@@ -136,10 +136,19 @@ class ParserProcessor(
             val annotation = classDeclaration.annotations.single { it.shortName.asString() == "MangaSourceParser" }
             val deprecation = classDeclaration.annotations.singleOrNull { it.shortName.asString() == "Deprecated" }
             val isBroken = classDeclaration.annotations.any { it.shortName.asString() == "Broken" }
-            val name = annotation.arguments.single { it.name?.asString() == "name" }.value as String
-            val title = annotation.arguments.single { it.name?.asString() == "title" }.value as String
-            val locale = annotation.arguments.single { it.name?.asString() == "locale" }.value as String
-            val type = annotation.arguments.single { it.name?.asString() == "type" }.value
+            val args = annotation.arguments.associateBy { it.name?.asString() }
+            val name = args["name"]?.value as? String
+            val title = args["title"]?.value as? String
+            val locale = args["locale"]?.value as? String ?: ""
+            val type = args["type"]?.value ?: "ContentType.MANGA"
+            if (name.isNullOrBlank() || title.isNullOrBlank()) {
+                logger.error("@MangaSourceParser missing required name/title", classDeclaration)
+                return
+            }
+            val typeString = when (val t = type) {
+                is String -> t
+                else -> t.toString()
+            }
             val localeString = "\"$locale\""
             val localeObj = if (locale.isEmpty()) null else Locale(locale)
             val localeTitle = localeObj?.getDisplayLanguage(localeObj)
@@ -179,7 +188,7 @@ class ParserProcessor(
                 }
             val localeComment = localeTitle?.toTitleCase(localeObj)?.let { " /* $it */" }.orEmpty()
             sourcesWriter?.write(
-                "\t$deprecationString$name(\"$title\", $localeString$localeComment, $type, $isBroken),\n",
+                "\t$deprecationString$name(\"$title\", $localeString$localeComment, $typeString, $isBroken),\n",
             )
         }
     }
