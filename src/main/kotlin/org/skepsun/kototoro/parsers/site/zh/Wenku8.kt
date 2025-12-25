@@ -134,26 +134,76 @@ internal class Wenku8(context: MangaLoaderContext) :
     }
 
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
-        val url = chapter.url.toAbsoluteUrl(domain)
-        val html = runCatching {
-            val doc = webClient.httpGet(url).parseHtmlGBK(url)
-            if (doc.selectFirst("form[name=frmlogin]") != null) {
-                buildErrorHtml("需要先登录后才能阅读本章节")
-            } else {
-                buildChapterHtml(doc, chapter.title ?: "")
-            }
-        }.getOrElse { throwable ->
-            buildErrorHtml("加载章节失败：${throwable.message ?: "未知错误"}")
-        }
-        val dataUrl = html.toDataUrl()
+        val content = getChapterContent(chapter) ?: return listOf(createErrorPage("内容为空"))
+        val dataUrl = content.html.toDataUrl()
         return listOf(
             MangaPage(
-                id = generateUid(url),
+                id = generateUid(chapter.url),
                 url = dataUrl,
                 preview = null,
                 source = source,
-            ),
+            )
         )
+    }
+
+    override suspend fun getChapterContent(chapter: MangaChapter): NovelChapterContent? {
+        val url = chapter.url.toAbsoluteUrl(domain)
+        return runCatching {
+            val doc = webClient.httpGet(url).parseHtmlGBK(url)
+            if (doc.selectFirst("form[name=frmlogin]") != null) {
+                return NovelChapterContent(
+                    html = buildErrorHtml("需要先登录后才能阅读本章节"),
+                    images = emptyList()
+                )
+            }
+            
+            val content = doc.selectFirst("#content") ?: return null
+            content.selectFirst("ul#contentdp")?.remove()
+            content.select("script,style,iframe").remove()
+            
+            val images = mutableListOf<NovelChapterContent.NovelImage>()
+            
+            // Process images
+            content.select("img[src]").forEach { img ->
+                val abs = img.absUrl("src").ifBlank { img.attr("src") }
+                if (abs.isNullOrBlank()) {
+                    img.remove()
+                } else {
+                    img.attr("src", abs)
+                    img.attr("referrerpolicy", "no-referrer")
+                    images.add(
+                        NovelChapterContent.NovelImage(
+                            url = abs,
+                            headers = mapOf("Referer" to "https://$domain/")
+                        )
+                    )
+                }
+            }
+            
+            val sanitized = content.html()
+            val html = buildString {
+                append("<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>")
+                append("<style>")
+                append(
+                    "body{font-family:\"Noto Serif SC\",\"PingFang SC\",sans-serif;padding:16px;margin:0;" +
+                        "line-height:1.9;font-size:1.05rem;}" +
+                        "img{max-width:100%;height:auto;}p{margin:0 0 1rem;}h1{font-size:1.3rem;margin-bottom:1rem;}"
+                )
+                append("</style></head><body>")
+                if (!chapter.title.isNullOrBlank()) {
+                    append("<h1>").append(chapter.title).append("</h1>")
+                }
+                append(sanitized)
+                append("</body></html>")
+            }
+            
+            NovelChapterContent(html = html, images = images)
+        }.getOrElse {
+            NovelChapterContent(
+                html = buildErrorHtml("加载章节失败：${it.message ?: "未知错误"}"),
+                images = emptyList()
+            )
+        }
     }
 
     override suspend fun getPageUrl(page: MangaPage): String = page.url.toAbsoluteUrl(domain)
@@ -377,37 +427,15 @@ internal class Wenku8(context: MangaLoaderContext) :
         return tags
     }
 
-	private fun buildChapterHtml(doc: Document, title: String): String {
-		val content = doc.selectFirst("#content") ?: return "<p>内容为空</p>"
-		content.selectFirst("ul#contentdp")?.remove()
-		content.select("script,style,iframe").remove()
-		// 补全图片地址，避免相对路径导致丢图
-		content.select("img[src]").forEach { img ->
-			val abs = img.absUrl("src").ifBlank { img.attr("src") }
-			if (abs.isNullOrBlank()) {
-				img.remove()
-			} else {
-				img.attr("src", abs)
-				img.attr("referrerpolicy", "no-referrer")
-			}
-		}
-		val sanitized = content.html()
-		return buildString {
-			append("<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>")
-			append("<style>")
-			append(
-                "body{font-family:\"Noto Serif SC\",\"PingFang SC\",sans-serif;padding:16px;margin:0;" +
-                    "line-height:1.9;font-size:1.05rem;}" +
-                    "img{max-width:100%;height:auto;}p{margin:0 0 1rem;}h1{font-size:1.3rem;margin-bottom:1rem;}",
-            )
-            append("</style></head><body>")
-            if (title.isNotBlank()) {
-                append("<h1>").append(title).append("</h1>")
-            }
-            append(sanitized)
-            append("</body></html>")
-        }
-    }
+	private fun createErrorPage(message: String): MangaPage {
+		val html = buildErrorHtml(message)
+		return MangaPage(
+			id = generateUid(message),
+			url = html.toDataUrl(),
+			preview = null,
+			source = source,
+		)
+	}
 
     private fun buildErrorHtml(message: String): String = """
         <!DOCTYPE html><html><head><meta charset="utf-8"/>

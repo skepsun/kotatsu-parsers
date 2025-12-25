@@ -577,40 +577,48 @@ internal class Novelia(context: MangaLoaderContext) :
      * 获取章节内容
      */
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
-        // 从URL中提取信息
+        val content = getChapterContent(chapter) ?: return listOf(createErrorPage("内容为空"))
+        val dataUrl = content.html.toDataUrl()
+        return listOf(
+            MangaPage(
+                id = generateUid(chapter.url),
+                url = dataUrl,
+                preview = null,
+                source = source,
+            )
+        )
+    }
+
+    override suspend fun getChapterContent(chapter: MangaChapter): NovelChapterContent? {
+        // 从 URL 中提取信息
         // URL格式: /novel/hameln/389053/1?branch=GPT翻译
         val urlParts = chapter.url.split("?")
         val pathParts = urlParts[0].split("/")
         
         if (pathParts.size < 5) {
-            return listOf(createErrorPage("Invalid chapter URL"))
+            return NovelChapterContent(
+                html = buildErrorHtml("Invalid chapter URL"),
+                images = emptyList()
+            )
         }
         
         val provider = pathParts[2]
         val novelId = pathParts[3]
         val chapterId = pathParts[4]
         
-        // 从URL参数中提取翻译版本
+        // 从 URL 参数中提取翻译版本
         val branch = chapter.branch ?: "GPT翻译"
         
-        // 调用API获取章节内容
-        // 实际API格式: /api/novel/{provider}/{novelId}/chapter/{chapterId}
+        // 调用 API 获取章节内容
         val apiUrl = "https://$domain/api/novel/$provider/$novelId/chapter/$chapterId"
         
         return try {
             val json = webClient.httpGet(apiUrl, getRequestHeaders()).parseJson()
             
-            // API返回多种翻译版本：
-            // - paragraphs: 日文原文
-            // - gptParagraphs: GPT翻译
-            // - baiduParagraphs: 百度翻译
-            // - sakuraParagraphs: Sakura翻译
-            // - youdaoParagraphs: 有道翻译
-            
             val titleZh = json.optString("titleZh", chapter.title ?: "")
             val titleJp = json.optString("titleJp", chapter.title ?: "")
             
-            // 根据branch选择对应的翻译版本
+            // 根据 branch 选择对应的翻译版本
             val paragraphsArray = when (branch) {
                 "GPT翻译" -> json.optJSONArray("gptParagraphs")
                 "Sakura翻译" -> json.optJSONArray("sakuraParagraphs")
@@ -620,9 +628,11 @@ internal class Novelia(context: MangaLoaderContext) :
                 else -> json.optJSONArray("gptParagraphs")
             }
             
-            // 如果翻译版本不可用（理论上不应该发生，因为已经过滤了）
             if (paragraphsArray == null || paragraphsArray.length() == 0) {
-                return listOf(createErrorPage("章节内容为空或该翻译版本不可用"))
+                return NovelChapterContent(
+                    html = buildErrorHtml("章节内容为空或该翻译版本不可用"),
+                    images = emptyList()
+                )
             }
             
             // 将段落数组转换为文本
@@ -637,20 +647,14 @@ internal class Novelia(context: MangaLoaderContext) :
             // 根据翻译版本选择标题
             val title = if (branch == "日文原文") titleJp else titleZh
             
-            // 构建HTML
+            // 构建 HTML
             val html = buildChapterHtml(title, paragraphs, branch)
-            val dataUrl = html.toDataUrl()
-            
-            listOf(
-                MangaPage(
-                    id = generateUid(chapter.url),
-                    url = dataUrl,
-                    preview = null,
-                    source = source,
-                )
-            )
+            NovelChapterContent(html = html, images = emptyList())
         } catch (e: Exception) {
-            listOf(createErrorPage("加载失败: ${e.message}"))
+            NovelChapterContent(
+                html = buildErrorHtml("加载失败: ${e.message}"),
+                images = emptyList()
+            )
         }
     }
 
@@ -706,16 +710,14 @@ internal class Novelia(context: MangaLoaderContext) :
         }
     }
 
-    /**
-     * 创建错误页面
-     */
+    private fun buildErrorHtml(message: String): String = """
+        <!DOCTYPE html><html><head><meta charset="utf-8"/>
+        <style>body{font-family:sans-serif;padding:16px;}</style>
+        </head><body><h1>错误</h1><p>$message</p></body></html>
+    """.trimIndent()
+
     private fun createErrorPage(message: String): MangaPage {
-        val html = """
-            <!DOCTYPE html><html><head><meta charset="utf-8"/>
-            <style>body{font-family:sans-serif;padding:16px;}</style>
-            </head><body><h1>错误</h1><p>$message</p></body></html>
-        """.trimIndent()
-        
+        val html = buildErrorHtml(message)
         return MangaPage(
             id = generateUid(message),
             url = html.toDataUrl(),

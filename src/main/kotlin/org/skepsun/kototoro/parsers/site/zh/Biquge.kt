@@ -88,10 +88,26 @@ internal class Biquge(context: MangaLoaderContext) :
     }
 
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
+        val content = getChapterContent(chapter) ?: return listOf(createErrorPage("内容为空"))
+        val dataUrl = content.html.toDataUrl()
+        return listOf(
+            MangaPage(
+                id = generateUid(chapter.url),
+                url = dataUrl,
+                preview = null,
+                source = source,
+            )
+        )
+    }
+
+    override suspend fun getChapterContent(chapter: MangaChapter): NovelChapterContent? {
         // URL格式: /book/{bookId}/{chapterId}
         val parts = chapter.url.split("/")
         if (parts.size < 4) {
-            return listOf(createErrorPage("Invalid chapter URL"))
+            return NovelChapterContent(
+                html = buildErrorHtml("Invalid chapter URL"),
+                images = emptyList()
+            )
         }
         
         val bookId = parts[2]
@@ -105,22 +121,19 @@ internal class Biquge(context: MangaLoaderContext) :
             val chapterName = json.optString("chaptername", chapter.title ?: "")
             
             if (content.isEmpty()) {
-                return listOf(createErrorPage("章节内容为空"))
+                return NovelChapterContent(
+                    html = buildErrorHtml("章节内容为空"),
+                    images = emptyList()
+                )
             }
             
             val html = buildChapterHtml(chapterName, content)
-            val dataUrl = html.toDataUrl()
-            
-            listOf(
-                MangaPage(
-                    id = generateUid(chapter.url),
-                    url = dataUrl,
-                    preview = null,
-                    source = source,
-                )
-            )
+            NovelChapterContent(html = html, images = emptyList())
         } catch (e: Exception) {
-            listOf(createErrorPage("加载失败: ${e.message}"))
+            NovelChapterContent(
+                html = buildErrorHtml("加载失败: ${e.message}"),
+                images = emptyList()
+            )
         }
     }
 
@@ -271,16 +284,14 @@ internal class Biquge(context: MangaLoaderContext) :
         }
     }
 
-    /**
-     * 创建错误页面
-     */
+    private fun buildErrorHtml(message: String): String = """
+        <!DOCTYPE html><html><head><meta charset="utf-8"/>
+        <style>body{font-family:sans-serif;padding:16px;}</style>
+        </head><body><h1>错误</h1><p>$message</p></body></html>
+    """.trimIndent()
+
     private fun createErrorPage(message: String): MangaPage {
-        val html = """
-            <!DOCTYPE html><html><head><meta charset="utf-8"/>
-            <style>body{font-family:sans-serif;padding:16px;}</style>
-            </head><body><h1>错误</h1><p>$message</p></body></html>
-        """.trimIndent()
-        
+        val html = buildErrorHtml(message)
         return MangaPage(
             id = generateUid(message),
             url = html.toDataUrl(),
