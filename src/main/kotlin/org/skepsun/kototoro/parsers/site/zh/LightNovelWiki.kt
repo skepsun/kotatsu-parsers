@@ -6,6 +6,7 @@ import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedMangaParser
 import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.model.NovelChapterContent
 import org.skepsun.kototoro.parsers.util.*
 import java.nio.charset.StandardCharsets
 import java.util.EnumSet
@@ -194,6 +195,18 @@ internal class LightNovelWiki(context: MangaLoaderContext) :
     }
 
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
+        val content = getChapterContent(chapter) ?: return emptyList()
+        return listOf(
+            MangaPage(
+                id = generateUid(chapter.url),
+                url = content.html.toDataUrl(),
+                preview = null,
+                source = source
+            )
+        )
+    }
+
+    override suspend fun getChapterContent(chapter: MangaChapter): NovelChapterContent? {
         val url = chapter.url.toAbsoluteUrl(domain)
         val doc = webClient.httpGet(url).parseHtml()
         
@@ -209,14 +222,11 @@ internal class LightNovelWiki(context: MangaLoaderContext) :
         val contentHtml = buildString {
             // Main text content
             val mainContent = contentElement.clone()
-            // We no longer strip title aggressively here as it often removes paragraphs containing the title 
-            // or even the container itself if it's broad. Readers usually prefer the title at the top anyway.
             append(mainContent.html())
             
             // Siblings (often illustrations are siblings of the content div)
             var next = contentElement.nextElementSibling()
             while (next != null && (next.tagName() == "a" || next.tagName() == "img" || next.hasClass("d-block"))) {
-                // Ensure we capture images inside links if they are illustration siblings
                 if (next.tagName() == "a" && next.selectFirst("img") != null) {
                     append(next.selectFirst("img")!!.outerHtml())
                 } else {
@@ -227,25 +237,26 @@ internal class LightNovelWiki(context: MangaLoaderContext) :
             }
         }
         
-        // Process images (in the built HTML)
+        // Process images (in the built HTML) and collect urls
+        val images = mutableListOf<NovelChapterContent.NovelImage>()
         val finalDoc = org.jsoup.Jsoup.parseBodyFragment(contentHtml)
         finalDoc.select("img").forEach { img ->
             val src = (img.attr("data-src").ifBlank { img.attr("src") }).trim()
             if (src.isNotBlank()) {
-                img.attr("src", src.toAbsoluteUrl(domain))
+                val abs = src.toAbsoluteUrl(domain)
+                img.attr("src", abs)
                 img.attr("referrerpolicy", "no-referrer")
+                images.add(
+                    NovelChapterContent.NovelImage(
+                        url = abs,
+                        headers = mapOf("Referer" to "https://$domain/")
+                    )
+                )
             }
         }
 
         val html = buildChapterHtml(finalDoc.body().html(), chapter.title ?: "")
-        return listOf(
-            MangaPage(
-                id = generateUid(chapter.url),
-                url = html.toDataUrl(),
-                preview = null,
-                source = source
-            )
-        )
+        return NovelChapterContent(html = html, images = images)
     }
 
     private fun buildChapterHtml(content: String, title: String): String {

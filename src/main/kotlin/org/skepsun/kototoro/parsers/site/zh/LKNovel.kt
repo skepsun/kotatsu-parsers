@@ -8,6 +8,7 @@ import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedMangaParser
 import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.model.NovelChapterContent
 import org.skepsun.kototoro.parsers.network.UserAgents
 import org.skepsun.kototoro.parsers.util.*
 import java.nio.charset.StandardCharsets
@@ -269,6 +270,18 @@ internal class LKNovelUs(context: MangaLoaderContext) :
     }
 
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
+        val content = getChapterContent(chapter) ?: return emptyList()
+        return listOf(
+            MangaPage(
+                id = generateUid(chapter.url),
+                url = content.html.toDataUrl(),
+                preview = null,
+                source = source
+            )
+        )
+    }
+
+    override suspend fun getChapterContent(chapter: MangaChapter): NovelChapterContent? {
         val aid = chapter.url.substringAfterLast("/")
         val url = "https://api.lightnovel.fun/api/article/get-detail"
         val data = JSONObject().apply {
@@ -280,16 +293,24 @@ internal class LKNovelUs(context: MangaLoaderContext) :
         val content = dataObj.optString("content")
         val resInfo = dataObj.optJSONObject("res_info")
             ?: dataObj.optJSONObject("res")?.optJSONObject("res_info")
-        
+        val images = mutableListOf<NovelChapterContent.NovelImage>()
+        resInfo?.let { info ->
+            info.keys().forEach { key ->
+                val obj = info.optJSONObject(key) ?: return@forEach
+                val urlVal = obj.optString("url").orEmpty()
+                if (urlVal.isNotBlank()) {
+                    images.add(
+                        NovelChapterContent.NovelImage(
+                            url = urlVal,
+                            headers = mapOf("Referer" to "https://$domain/")
+                        )
+                    )
+                }
+            }
+        }
+
         val html = buildChapterHtml(content, chapter.title ?: "", resInfo)
-        return listOf(
-            MangaPage(
-                id = generateUid(chapter.url),
-                url = html.toDataUrl(),
-                preview = null,
-                source = source
-            )
-        )
+        return NovelChapterContent(html = html, images = images)
     }
 
     private fun buildChapterHtml(content: String, title: String, resInfo: JSONObject? = null): String {

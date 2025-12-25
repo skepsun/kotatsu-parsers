@@ -44,7 +44,7 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
     override val configKeyDomain = org.skepsun.kototoro.parsers.config.ConfigKey.Domain("v4api.zaimanhua.com")
     override val authUrl: String = "https://www.zaimanhua.com/login"
     override val faviconDomain: String
-        get() = "manhua.zaimanhua.com"
+        get() = "www.zaimanhua.com"
 
     private val tokenRef = AtomicReference<String?>()
     private val usernameRef = AtomicReference<String?>()

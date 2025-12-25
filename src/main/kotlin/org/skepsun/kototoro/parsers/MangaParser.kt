@@ -6,6 +6,7 @@ import okhttp3.Interceptor
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.config.MangaSourceConfig
 import org.skepsun.kototoro.parsers.model.*
+import org.skepsun.kototoro.parsers.model.NovelChapterContent
 import org.skepsun.kototoro.parsers.model.search.MangaSearchQuery
 import org.skepsun.kototoro.parsers.model.search.MangaSearchQueryCapabilities
 import org.skepsun.kototoro.parsers.util.LinkResolver
@@ -65,6 +66,11 @@ public interface MangaParser : Interceptor {
 	 * Fetch direct link to the page image.
 	 */
 	public suspend fun getPageUrl(page: MangaPage): String
+
+	/**
+	 * 可选：返回小说章节的完整 HTML 与图片资源，用于离线下载。默认返回 null。
+	 */
+	public suspend fun getChapterContent(chapter: MangaChapter): NovelChapterContent? = null
 
 	public suspend fun getFilterOptions(): MangaListFilterOptions
 

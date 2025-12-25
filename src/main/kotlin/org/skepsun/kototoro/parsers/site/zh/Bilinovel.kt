@@ -468,34 +468,40 @@ internal class Bilinovel(context: MangaLoaderContext) :
     }
 
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
+        val content = getChapterContent(chapter) ?: return listOf(createErrorPage("内容为空"))
+        val dataUrl = content.html.toDataUrl(context)
+        return listOf(
+            MangaPage(
+                id = generateUid(chapter.url),
+                url = dataUrl,
+                preview = null,
+                source = source,
+            )
+        )
+    }
+
+    override suspend fun getChapterContent(chapter: MangaChapter): NovelChapterContent? {
         val url = chapter.url.let { if (it.startsWith("http")) it else "https://$domain$it" }
-        return try {
+        return runCatching {
             val doc = webClient.httpGet(url, getRequestHeaders()).parseHtml()
             val content = doc.selectFirst("#acontent") ?: doc.selectFirst("#article") ?: doc.selectFirst(".content")
-            
-            if (content == null) {
-                println("Bilinovel: Content element NOT FOUND!")
-                return listOf(createErrorPage("内容为空"))
-            } else {
-                val html = content.html()
-                // println("Bilinovel: Content element FOUND. HTML length: ${html.length}")
-            }
-                // ?: return listOf(createErrorPage("内容为空"))
+                ?: return null
+
             // 移除广告/脚本/多余空行
             content.select("script, style, iframe, ins, .co, .google-auto-placed").remove()
-            
+
             // 移除纯空行的段落 (但保留图片)
-            content.select("p").filter { p -> 
+            content.select("p").filter { p ->
                 p.select("img").isEmpty() && p.text().trim().replace(" ", "").isEmpty()
             }.forEach { it.remove() }
 
-            // 移除连续的 br
-            // content.select("br + br").remove() 
             // 移除段落前后的 br
             content.select("p + br").remove()
             content.select("br + p").remove()
 
-            // 处理图片：直接使用原始 URL，交给阅读器端附加 Referer
+            val images = mutableListOf<NovelChapterContent.NovelImage>()
+
+            // 处理图片：直接使用原始 URL，并收集下载所需的 Referer 头
             val imgElements = content.select("img")
             println("Bilinovel: Found ${imgElements.size} img tags before processing")
             var okCount = 0
@@ -518,6 +524,17 @@ internal class Bilinovel(context: MangaLoaderContext) :
                 img.attr("referrerpolicy", "no-referrer")
                 img.attr("loading", "lazy")
                 okCount++
+
+                images.add(
+                    NovelChapterContent.NovelImage(
+                        url = absoluteUrl,
+                        headers = mapOf(
+                            "Referer" to "https://$domain/",
+                            "Origin" to "https://$domain",
+                            "Accept-Encoding" to "gzip",
+                        )
+                    )
+                )
             }
             println("Bilinovel: keep original img urls success=$okCount removed=${imgElements.size - okCount}")
 
@@ -533,17 +550,11 @@ internal class Bilinovel(context: MangaLoaderContext) :
                 append("</body></html>")
             }
             println("Bilinovel: final HTML length=${html.length}")
-            val dataUrl = html.toDataUrl(context)
-            listOf(
-                MangaPage(
-                    id = generateUid(chapter.url),
-                    url = dataUrl,
-                    preview = null,
-                    source = source,
-                )
-            )
-        } catch (e: Exception) {
-            listOf(createErrorPage("加载失败: ${e.message}"))
+
+            NovelChapterContent(html = html, images = images)
+        }.getOrElse {
+            println("Bilinovel: getChapterContent failed: ${it.message}")
+            null
         }
     }
 
