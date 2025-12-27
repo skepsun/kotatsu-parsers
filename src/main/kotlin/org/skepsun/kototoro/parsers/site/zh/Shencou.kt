@@ -1,13 +1,17 @@
 package org.skepsun.kototoro.parsers.site.zh
 
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.MangaParserCredentialsAuthProvider
 import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.exception.AuthRequiredException
 import org.skepsun.kototoro.parsers.model.*
 import org.skepsun.kototoro.parsers.network.CloudFlareHelper
 import org.skepsun.kototoro.parsers.network.UserAgents
@@ -17,7 +21,10 @@ import java.util.EnumSet
 
 @MangaSourceParser("SHENCOU", "神凑轻小说", "zh", type = ContentType.NOVEL)
 internal class Shencou(context: MangaLoaderContext) :
-    PagedMangaParser(context, MangaParserSource.SHENCOU, pageSize = 30), Interceptor {
+    PagedMangaParser(context, MangaParserSource.SHENCOU, pageSize = 30),
+    Interceptor,
+    MangaParserAuthProvider,
+    MangaParserCredentialsAuthProvider {
 
     override val configKeyDomain = ConfigKey.Domain("www.shencou.com")
     override val userAgentKey = ConfigKey.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0")
@@ -383,6 +390,42 @@ internal class Shencou(context: MangaLoaderContext) :
                 source = this@Shencou.source,
             )
         )
+    }
+
+    override val authUrl: String = "https://$domain/login.php"
+
+    override suspend fun isAuthorized(): Boolean {
+        return context.cookieJar.getCookies(domain).any { it.name == "jieqiUserInfo" }
+    }
+
+    override suspend fun getUsername(): String {
+        val cookies = context.cookieJar.getCookies(domain)
+        val userInfo = cookies.find { it.name == "jieqiUserInfo" }?.value ?: throw AuthRequiredException(source)
+        // jieqiUserInfo is often URL encoded and contains the username
+        return try {
+            java.net.URLDecoder.decode(userInfo, "GBK").substringAfter("jieqiUserName=").substringBefore("&")
+        } catch (e: Exception) {
+            "User"
+        }
+    }
+
+    override suspend fun login(username: String, password: String): Boolean {
+        val url = "https://$domain/login.php?do=submit"
+        
+        val body = mapOf(
+            "username" to username,
+            "password" to password,
+            "usecookie" to "315360000",
+            "action" to "login"
+        )
+        
+        val response = try {
+            webClient.httpPost(url.toHttpUrl(), body, getRequestHeaders())
+        } catch (e: Exception) {
+            return false
+        }
+        
+        return isAuthorized()
     }
 
     override suspend fun getPageUrl(page: MangaPage): String = page.url

@@ -5,6 +5,7 @@ package org.skepsun.kototoro.parsers.site.zh
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
+import org.skepsun.kototoro.parsers.FavoritesProvider
 import org.skepsun.kototoro.parsers.InternalParsersApi
 import org.skepsun.kototoro.parsers.MangaLoaderContext
 import org.skepsun.kototoro.parsers.MangaSourceParser
@@ -27,8 +28,11 @@ import org.skepsun.kototoro.parsers.model.MangaTagGroup
 import org.skepsun.kototoro.parsers.model.SortOrder
 import org.skepsun.kototoro.parsers.network.UserAgents
 import org.skepsun.kototoro.parsers.util.generateUid
+import org.skepsun.kototoro.parsers.util.getCookies
+import org.skepsun.kototoro.parsers.util.insertCookies
 import org.skepsun.kototoro.parsers.util.parseJsonObject
 import org.skepsun.kototoro.parsers.util.urlEncoded
+import java.time.LocalDate
 import java.util.EnumSet
 import java.util.concurrent.atomic.AtomicReference
 
@@ -39,15 +43,30 @@ import java.util.concurrent.atomic.AtomicReference
 internal class ZaimanhuaParser(context: MangaLoaderContext) :
     PagedMangaParser(context, MangaParserSource.ZAIMANHUA, pageSize = 20),
     MangaParserAuthProvider,
-    MangaParserCredentialsAuthProvider {
+    MangaParserCredentialsAuthProvider,
+    FavoritesProvider,
+    org.skepsun.kototoro.parsers.FavoritesSyncProvider {
 
     override val configKeyDomain = org.skepsun.kototoro.parsers.config.ConfigKey.Domain("v4api.zaimanhua.com")
     override val authUrl: String = "https://www.zaimanhua.com/login"
     override val faviconDomain: String
         get() = "www.zaimanhua.com"
 
+    override fun onCreateConfig(keys: MutableCollection<org.skepsun.kototoro.parsers.config.ConfigKey<*>>) {
+        super.onCreateConfig(keys)
+        keys.add(configKeyDomain)
+        keys.add(signTaskKey)
+    }
+
     private val tokenRef = AtomicReference<String?>()
     private val usernameRef = AtomicReference<String?>()
+    private val lastSignDate = AtomicReference<String?>()
+
+    init {
+        tokenRef.set(tokenFromCookies())
+        usernameRef.set(usernameFromCookies())
+        logAuth("init -> token=${maskToken(tokenRef.get())}, user=${usernameRef.get().orEmpty()}")
+    }
 
     private val categoryMap: List<FilterOption> = listOf(
         "全部" to "0",
@@ -128,6 +147,12 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
         FilterOption("8435", "其他", "zone"),
     )
 
+    private val signTaskKey = org.skepsun.kototoro.parsers.config.ConfigKey.Toggle(
+        key = "zaimanhua_sign_task",
+        title = "每日签到",
+        defaultValue = true,
+    )
+
     private fun headers(): Headers = Headers.Builder()
         .add("User-Agent", UserAgents.CHROME_DESKTOP)
         .apply {
@@ -144,7 +169,7 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
             isSearchSupported = true,
             isSearchWithFiltersSupported = true,
             isMultipleTagsSupported = true,
-        )
+    )
 
     override suspend fun getFilterOptions(): MangaListFilterOptions {
         val themeTags = categoryMap.map { it.toTag(source) }.toSet()
@@ -167,6 +192,7 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
     override fun getRequestHeaders(): Headers = headers()
 
     override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
+        runCatching { trySignTask() }
         val selected = filter.tags.associateBy { it.key.substringBefore(':', "") }
         val theme = selected["theme"]?.key?.substringAfter(':').orEmpty()
         val cate = selected["cate"]?.key?.substringAfter(':').orEmpty()
@@ -185,24 +211,36 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
         val dataObj = root.optJSONObject("data")
         val items = dataObj?.optJSONArray("comicList")
             ?: dataObj?.optJSONArray("data")
+            ?: dataObj?.optJSONArray("list")
             ?: root.optJSONArray("data")
             ?: root.optJSONArray("result")
             ?: return emptyList()
         val list = mutableListOf<Manga>()
         for (i in 0 until items.length()) {
             val obj = items.optJSONObject(i) ?: continue
-            val id = obj.optString("comic_id").ifEmpty { obj.optString("id") }
-            if (id.isEmpty()) continue
+            val id = listOf(obj.optString("comic_id"), obj.optString("id"))
+                .firstOrNull { it.isNotEmpty() && it != "0" }
+                ?: continue
             val title = obj.optString("title").ifEmpty { obj.optString("name") }
             val cover = obj.optString("cover")
-            val tags = obj.optJSONArray("types")?.let { tArr ->
-                val set = mutableSetOf<MangaTag>()
-                for (j in 0 until tArr.length()) {
-                    val t = tArr.optJSONObject(j)?.optString("tag_name").orEmpty()
-                    if (t.isNotEmpty()) set.add(MangaTag(t, t, source))
+            val tags: Set<MangaTag> = when {
+                obj.optJSONArray("types") != null -> {
+                    val tArr = obj.optJSONArray("types")
+                    mutableSetOf<MangaTag>().apply {
+                        for (j in 0 until tArr.length()) {
+                            val t = tArr.optJSONObject(j)?.optString("tag_name").orEmpty()
+                            if (t.isNotEmpty()) add(MangaTag(t, t, source))
+                        }
+                    }
                 }
-                set
-            } ?: emptySet()
+                obj.optString("types").isNotEmpty() -> {
+                    obj.optString("types").split('/', '、', ',', '|').mapNotNull {
+                        val t = it.trim()
+                        t.takeIf { it.isNotEmpty() }?.let { name -> MangaTag(name, name, source) }
+                    }.toSet()
+                }
+                else -> emptySet()
+            }
             val rating = classifyRating(tags)
             list.add(
                 Manga(
@@ -211,10 +249,10 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
                     publicUrl = "https://www.zaimanhua.com/comic/$id",
                     coverUrl = cover,
                     title = title,
-                    altTitles = emptySet(),
+                    altTitles = emptySet<String>(),
                     rating = org.skepsun.kototoro.parsers.model.RATING_UNKNOWN,
                     tags = tags,
-                    authors = emptySet(),
+                    authors = emptySet<String>(),
                     state = null,
                     source = source,
                     contentRating = rating,
@@ -226,10 +264,31 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
     }
 
     override suspend fun getDetails(manga: Manga): Manga {
-        val res = runCatching { webClient.httpGet(buildUrl("comic/detail/${manga.url}?channel=android"), headers()) }
-            .getOrElse { return manga }
+        fun freshHeaders(): Headers = headers().newBuilder()
+            .add("Cache-Control", "no-cache")
+            .add("Pragma", "no-cache")
+            .build()
+
+        var res = runCatching {
+            webClient.httpGet(buildUrl("comic/detail/${manga.url}?channel=android"), freshHeaders())
+        }.getOrElse { return manga }
+        if (res.code == 304) {
+            val retryUrl = buildUrl("comic/detail/${manga.url}?channel=android&_t=${System.currentTimeMillis()}")
+            res = runCatching { webClient.httpGet(retryUrl, freshHeaders()) }.getOrElse { return manga }
+        }
         if (!res.isSuccessful) return manga
-        val data = res.parseJsonObject().optJSONObject("data")?.optJSONObject("data") ?: return manga
+        val root = res.parseJsonObject()
+        val errno = root.optInt("errno", -1)
+        if (errno != 0) {
+            // errno 2 usually means "does not exist", but for some manga it means "login required"
+            if (errno == 2 && !isAuthorized()) {
+                throw AuthRequiredException(source)
+            }
+            return manga
+        }
+        val data = root.optJSONObject("data")?.optJSONObject("data")
+            ?: root.optJSONObject("data")
+            ?: return manga
         val title = data.optString("title", manga.title).ifEmpty { manga.title }
         val cover = data.optString("cover", manga.coverUrl)
         val desc = data.optString("description", manga.description ?: "")
@@ -256,16 +315,15 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
         val rating = classifyRating(tags)
 
         val chapters = mutableListOf<MangaChapter>()
-        val groups = data.optJSONArray("chapters") ?: org.json.JSONArray()
-        for (i in 0 until groups.length()) {
-            val group = groups.optJSONObject(i) ?: continue
-            val branchTitle = group.optString("title").ifEmpty { null }
-            val arr = group.optJSONArray("data") ?: continue
-            // API returns newest first; reverse to keep ascending order
+        val groupsArray = data.optJSONArray("chapters")
+            ?: data.optJSONArray("chapterList")
+        val groupsObject = if (groupsArray == null) data.optJSONObject("chapters") else null
+
+        fun appendGroup(branchTitle: String?, arr: org.json.JSONArray) {
             for (j in arr.length() - 1 downTo 0) {
                 val ch = arr.optJSONObject(j) ?: continue
-                val cid = ch.optString("chapter_id")
-                val name = ch.optString("chapter_title")
+                val cid = ch.optString("chapter_id").ifEmpty { ch.optString("id") }
+                val name = ch.optString("chapter_title").ifEmpty { ch.optString("title") }
                 if (cid.isEmpty()) continue
                 val number = (chapters.size + 1).toFloat()
                 chapters.add(
@@ -281,6 +339,24 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
                         source = source,
                     )
                 )
+            }
+        }
+
+        if (groupsArray != null) {
+            for (i in 0 until groupsArray.length()) {
+                val group = groupsArray.optJSONObject(i) ?: continue
+                val branchTitle = group.optString("title").ifEmpty { null }
+                val arr = group.optJSONArray("data")
+                    ?: group.optJSONArray("chapter_list")
+                    ?: continue
+                appendGroup(branchTitle, arr)
+            }
+        } else if (groupsObject != null) {
+            val keys = groupsObject.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val arr = groupsObject.optJSONArray(key) ?: continue
+                appendGroup(key.takeIf { it.isNotEmpty() }, arr)
             }
         }
 
@@ -350,6 +426,10 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
         }
         tokenRef.set(token)
         usernameRef.set(username)
+        context.cookieJar.insertCookies(config[configKeyDomain], "authorization=Bearer $token", "token=$token")
+        context.cookieJar.insertCookies(config[configKeyDomain], "zmh_username=${username.urlEncoded()}")
+        logAuth("login success -> token=${maskToken(token)}, user=$username")
+        lastSignDate.set(null)
         return true
     }
 
@@ -357,15 +437,82 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
         if (tokenRef.get().isNullOrEmpty()) {
             throw AuthRequiredException(source)
         }
-        return usernameRef.get() ?: throw ParseException("未能获取用户名，请重新登录", authUrl)
+        val cached = usernameRef.get().takeUnless { it.isNullOrEmpty() }
+            ?: usernameFromCookies()
+        if (cached != null) {
+            usernameRef.set(cached)
+            logAuth("getUsername -> cached user=$cached")
+            return cached
+        }
+        logAuth("getUsername -> fallback User (no username found)")
+        return "User"
     }
 
-    override suspend fun isAuthorized(): Boolean = !tokenRef.get().isNullOrEmpty()
+    override suspend fun isAuthorized(): Boolean {
+        if (tokenRef.get().isNullOrEmpty()) {
+            logAuth("isAuthorized -> memory token empty, try cookies")
+            tokenRef.set(tokenFromCookies())
+            if (usernameRef.get().isNullOrEmpty()) {
+                usernameRef.set(usernameFromCookies())
+            }
+        }
+        val ok = !tokenRef.get().isNullOrEmpty()
+        logAuth("isAuthorized -> $ok, token=${maskToken(tokenRef.get())}, user=${usernameRef.get().orEmpty()}")
+        return ok
+    }
 
     suspend fun logout(): Boolean {
         tokenRef.set(null)
         usernameRef.set(null)
+        context.cookieJar.insertCookies(
+            config[configKeyDomain],
+            "authorization=; Max-Age=0; Path=/",
+            "token=; Max-Age=0; Path=/",
+            "zmh_username=; Max-Age=0; Path=/",
+        )
+        logAuth("logout -> cleared token/user")
+        lastSignDate.set(null)
         return true
+    }
+
+    private fun tokenFromCookies(): String? {
+        val domains = listOf(
+            config[configKeyDomain],
+            "account-api.zaimanhua.com",
+            "www.zaimanhua.com",
+            "zaimanhua.com",
+        ).distinct()
+        for (host in domains) {
+            val cookies = context.cookieJar.getCookies(host)
+            val tokenCookie = cookies.firstOrNull { it.name.equals("authorization", true) || it.name.equals("token", true) }
+            if (tokenCookie != null && tokenCookie.value.isNotBlank()) {
+                logAuth("tokenFromCookies -> hit domain=$host, name=${tokenCookie.name}, value=${maskToken(tokenCookie.value)}")
+                return tokenCookie.value.removePrefix("Bearer ").takeIf { it.isNotBlank() }
+            } else {
+                logAuth("tokenFromCookies -> domain=$host, cookies=${cookies.joinToString { it.name }}")
+            }
+        }
+        logAuth("tokenFromCookies -> not found")
+        return null
+    }
+
+    private fun usernameFromCookies(): String? {
+        val host = config[configKeyDomain]
+        val cookies = context.cookieJar.getCookies(host)
+        val user = cookies.firstOrNull { it.name.equals("zmh_username", true) }
+            ?.value
+            ?.takeIf { it.isNotBlank() }
+        logAuth("usernameFromCookies -> domain=$host, names=${cookies.joinToString { it.name }}, user=${user.orEmpty()}")
+        return user
+    }
+
+    private fun maskToken(token: String?): String {
+        if (token.isNullOrEmpty()) return ""
+        return if (token.length <= 8) token else token.take(4) + "..." + token.takeLast(4)
+    }
+
+    private fun logAuth(msg: String) {
+        kotlin.runCatching { println("[ZaimanhuaAuth] $msg") }
     }
 
     private fun classifyRating(tags: Set<MangaTag>): ContentRating {
@@ -381,5 +528,99 @@ internal class ZaimanhuaParser(context: MangaLoaderContext) :
 
     private data class FilterOption(val value: String, val title: String, val ns: String) {
         fun toTag(source: MangaSource): MangaTag = MangaTag(title, "$ns:$value", source)
+    }
+
+    private suspend fun trySignTask() {
+        if (!config[signTaskKey]) return
+        if (tokenRef.get().isNullOrEmpty()) return
+        val today = LocalDate.now().toString()
+        if (lastSignDate.get() == today) return
+        val res = runCatching {
+            webClient.httpPost(
+                "https://i.zaimanhua.com/lpi/v1/task/sign_in".toHttpUrl(),
+                emptyMap<String, String>(),
+                headers(),
+            )
+        }.getOrElse { return }
+        if (!res.isSuccessful) return
+        val json = res.parseJsonObject()
+        if (json.optInt("errno", -1) == 0) {
+            lastSignDate.set(today)
+            context.showToast("再漫画：签到成功")
+        }
+    }
+
+    override suspend fun fetchFavorites(): List<Manga> {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        val headers = headers()
+        val result = mutableListOf<Manga>()
+        var page = 1
+        val size = 50
+        while (true) {
+            val url = buildUrl("comic/sub/list?status=0&page=$page&size=$size")
+            val resp = webClient.httpGet(url, headers)
+            if (resp.code == 401) throw AuthRequiredException(source)
+            if (!resp.isSuccessful) break
+            val json = resp.parseJsonObject()
+            val data = json.optJSONObject("data")
+            val subList = data?.optJSONArray("subList") ?: break
+            if (subList.length() == 0) break
+            for (i in 0 until subList.length()) {
+                val obj = subList.optJSONObject(i) ?: continue
+                val id = obj.optString("comic_id").ifEmpty { obj.optString("id") }
+                if (id.isEmpty()) continue
+                val title = obj.optString("title").ifEmpty { obj.optString("name") }
+                val cover = obj.optString("cover")
+                val tags = obj.optJSONArray("types")?.let { arr ->
+                    mutableSetOf<MangaTag>().apply {
+                        for (j in 0 until arr.length()) {
+                            val n = arr.optJSONObject(j)?.optString("tag_name").orEmpty()
+                            if (n.isNotEmpty()) add(MangaTag(n, n, source))
+                        }
+                    }
+                } ?: emptySet()
+                val rating = classifyRating(tags)
+                result.add(
+                    Manga(
+                        id = generateUid(id),
+                        url = id,
+                        publicUrl = "https://www.zaimanhua.com/comic/$id",
+                        coverUrl = cover,
+                        title = title,
+                        altTitles = emptySet(),
+                        rating = org.skepsun.kototoro.parsers.model.RATING_UNKNOWN,
+                        tags = tags,
+                        authors = emptySet(),
+                        state = null,
+                        source = source,
+                        contentRating = rating,
+                    )
+                )
+            }
+            val total = data?.optInt("total", result.size) ?: result.size
+            if (page * size >= total) break
+            page += 1
+        }
+        return result
+    }
+
+    override suspend fun addFavorite(manga: Manga): Boolean {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        val headers = headers()
+        val url = buildUrl("comic/sub/add?comic_id=${manga.url}")
+        val res = webClient.httpGet(url, headers)
+        if (res.code == 401) throw AuthRequiredException(source)
+        val json = res.parseJsonObject()
+        return json.optInt("errno", -1) == 0
+    }
+
+    override suspend fun removeFavorite(manga: Manga): Boolean {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        val headers = headers()
+        val url = buildUrl("comic/sub/del?comic_id=${manga.url}")
+        val res = webClient.httpGet(url, headers)
+        if (res.code == 401) throw AuthRequiredException(source)
+        val json = res.parseJsonObject()
+        return json.optInt("errno", -1) == 0
     }
 }

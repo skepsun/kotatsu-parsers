@@ -1,14 +1,18 @@
 package org.skepsun.kototoro.parsers.site.zh
 
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.nodes.Document
 
 import org.jsoup.nodes.Element
 import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.MangaParserCredentialsAuthProvider
 import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.exception.AuthRequiredException
 import org.skepsun.kototoro.parsers.model.*
 import org.skepsun.kototoro.parsers.network.UserAgents
 import org.skepsun.kototoro.parsers.util.*
@@ -26,7 +30,10 @@ import java.io.File
  */
 @MangaSourceParser("BILINOVEL", "哔哩轻小说", "zh", type = ContentType.NOVEL)
 internal class Bilinovel(context: MangaLoaderContext) :
-    PagedMangaParser(context, MangaParserSource.BILINOVEL, pageSize = 20), Interceptor {
+    PagedMangaParser(context, MangaParserSource.BILINOVEL, pageSize = 20),
+    Interceptor,
+    MangaParserAuthProvider,
+    MangaParserCredentialsAuthProvider {
 
 
     companion object {
@@ -481,14 +488,33 @@ internal class Bilinovel(context: MangaLoaderContext) :
     }
 
     override suspend fun getChapterContent(chapter: MangaChapter): NovelChapterContent? {
-        val url = chapter.url.let { if (it.startsWith("http")) it else "https://$domain$it" }
-        return runCatching {
-            val doc = webClient.httpGet(url, getRequestHeaders()).parseHtml()
-            val content = doc.selectFirst("#acontent") ?: doc.selectFirst("#article") ?: doc.selectFirst(".content")
-                ?: return null
+        val initialUrl = chapter.url.let { if (it.startsWith("http")) it else "https://$domain$it" }
+        val allHtml = StringBuilder()
+        val allImages = mutableListOf<NovelChapterContent.NovelImage>()
+        val seenPages = mutableSetOf<String>()
+        var currentUrl: String? = initialUrl
+        var pageCount = 0
 
-            // 移除广告/脚本/多余空行
+        while (currentUrl != null && pageCount < 30) { // Safety limit: 30 pages per chapter
+            if (seenPages.contains(currentUrl)) break
+            seenPages.add(currentUrl)
+
+            val doc = runCatching {
+                webClient.httpGet(currentUrl!!, getRequestHeaders()).parseHtml()
+            }.getOrNull() ?: break
+
+            val content = doc.selectFirst("#acontent") ?: doc.selectFirst("#article") ?: doc.selectFirst(".content")
+                ?: break
+
+            // 移除广告/脚本/多余空行以及防爬虫提示
             content.select("script, style, iframe, ins, .co, .google-auto-placed").remove()
+            // 过滤“如需繼續閱讀請使用 [Chrome瀏覽器] 訪問”
+            content.select("p").filter { p ->
+                val text = p.text()
+                text.contains("Chrome瀏覽器", ignoreCase = true) || 
+                text.contains("Chrome浏览器", ignoreCase = true) ||
+                text.contains("繼續閱讀請使用", ignoreCase = true)
+            }.forEach { it.remove() }
 
             // 移除纯空行的段落 (但保留图片)
             content.select("p").filter { p ->
@@ -499,13 +525,8 @@ internal class Bilinovel(context: MangaLoaderContext) :
             content.select("p + br").remove()
             content.select("br + p").remove()
 
-            val images = mutableListOf<NovelChapterContent.NovelImage>()
-
-            // 处理图片：直接使用原始 URL，并收集下载所需的 Referer 头
-            val imgElements = content.select("img")
-            println("Bilinovel: Found ${imgElements.size} img tags before processing")
-            var okCount = 0
-            imgElements.forEach { img ->
+            // 处理图片
+            content.select("img").forEach { img ->
                 val src = (img.attr("data-src").ifBlank { img.attr("src") }).trim()
                 if (src.isBlank() || src.contains("sloading.svg")) {
                     img.remove()
@@ -516,16 +537,15 @@ internal class Bilinovel(context: MangaLoaderContext) :
                     src.startsWith("http") -> src
                     src.startsWith("//") -> "https:$src"
                     src.startsWith("/") -> "https://$domain$src"
-                    else -> "https://$domain/$src" // fallback
+                    else -> "https://$domain/$src"
                 }
 
                 img.attr("src", absoluteUrl)
                 img.removeAttr("data-src")
                 img.attr("referrerpolicy", "no-referrer")
                 img.attr("loading", "lazy")
-                okCount++
 
-                images.add(
+                allImages.add(
                     NovelChapterContent.NovelImage(
                         url = absoluteUrl,
                         headers = mapOf(
@@ -536,26 +556,57 @@ internal class Bilinovel(context: MangaLoaderContext) :
                     )
                 )
             }
-            println("Bilinovel: keep original img urls success=$okCount removed=${imgElements.size - okCount}")
 
-            val bodyHtml = content.html().replace("\n", "").replace("\r", "")
-            val html = buildString {
-                append("<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>")
-                append("<style>body{font-family:\"Noto Serif SC\",\"PingFang SC\",sans-serif;padding:16px;padding-bottom:50px;margin:0;line-height:1.9;font-size:1.05rem;}img{max-width:100%;height:auto;}p{margin:0 0 1rem;}p:last-child{margin-bottom:0;}h1{font-size:1.3rem;margin-bottom:1rem;}</style>")
-                append("</head><body>")
-                if (!chapter.title.isNullOrBlank()) {
-                    append("<h1>").append(chapter.title).append("</h1>")
-                }
-                append(bodyHtml)
-                append("</body></html>")
+            allHtml.append(content.html())
+
+            // 查找下一页链接
+            val nextLink = doc.select(".Readpage a, #footlink a, .page-ctrl a").find {
+                val text = it.text()
+                text.contains("下一页") || text.contains("下一頁")
             }
-            println("Bilinovel: final HTML length=${html.length}")
-
-            NovelChapterContent(html = html, images = images)
-        }.getOrElse {
-            println("Bilinovel: getChapterContent failed: ${it.message}")
-            null
+            
+            val nextHref = nextLink?.attr("href")
+            if (nextHref != null && (nextHref.contains("_") || nextHref.contains("-"))) {
+                val nextAbsolute = nextLink.attrAsAbsoluteUrlOrNull("href")
+                // 确保下一页仍在同一个章节路径下（避免跳到下一章）
+                if (nextAbsolute != null && isSameChapterUrl(initialUrl, nextAbsolute)) {
+                    currentUrl = nextAbsolute
+                    pageCount++
+                } else {
+                    currentUrl = null
+                }
+            } else {
+                currentUrl = null
+            }
         }
+
+        if (allHtml.isEmpty()) return null
+
+        val bodyHtml = allHtml.toString().replace("\n", "").replace("\r", "")
+        val html = buildString {
+            append("<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>")
+            append("<style>body{font-family:\"Noto Serif SC\",\"PingFang SC\",sans-serif;padding:16px;padding-bottom:50px;margin:0;line-height:1.9;font-size:1.05rem;}img{max-width:100%;height:auto;}p{margin:0 0 1rem;}p:last-child{margin-bottom:0;}h1{font-size:1.3rem;margin-bottom:1rem;}</style>")
+            append("</head><body>")
+            if (!chapter.title.isNullOrBlank()) {
+                append("<h1>").append(chapter.title).append("</h1>")
+            }
+            append(bodyHtml)
+            append("</body></html>")
+        }
+        println("Bilinovel: final HTML length=${html.length}, pages=$pageCount, images=${allImages.size}")
+
+        return NovelChapterContent(html = html, images = allImages)
+    }
+
+    private fun isSameChapterUrl(original: String, next: String): Boolean {
+        // 简单判断逻辑：移除后缀与分页标记后，基础路径应保持一致
+        fun getBase(url: String): String {
+            return url.substringBefore("_")
+                .substringBefore(".html")
+                .substringBefore("-")
+                .removeSuffix("/")
+        }
+        return getBase(original) == getBase(next)
     }
 
     override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
@@ -564,6 +615,41 @@ internal class Bilinovel(context: MangaLoaderContext) :
     }
 
     override suspend fun getPageUrl(page: MangaPage): String = page.url
+
+    override val authUrl: String = "https://$domain/login.php"
+
+    override suspend fun isAuthorized(): Boolean {
+        return context.cookieJar.getCookies(domain).any { it.name == "jieqiUserInfo" }
+    }
+
+    override suspend fun getUsername(): String {
+        val cookies = context.cookieJar.getCookies(domain)
+        val userInfo = cookies.find { it.name == "jieqiUserInfo" }?.value ?: throw AuthRequiredException(source)
+        return try {
+            java.net.URLDecoder.decode(userInfo, "UTF-8").substringAfter("jieqiUserName=").substringBefore("&")
+        } catch (e: Exception) {
+            "User"
+        }
+    }
+
+    override suspend fun login(username: String, password: String): Boolean {
+        val url = "https://$domain/login.php?do=submit"
+        
+        val body = mapOf(
+            "username" to username,
+            "password" to password,
+            "usecookie" to "315360000",
+            "action" to "login"
+        )
+        
+        val response = try {
+            webClient.httpPost(url.toHttpUrl(), body, getRequestHeaders())
+        } catch (e: Exception) {
+            return false
+        }
+        
+        return isAuthorized()
+    }
 
     /**
      * 创建错误页面

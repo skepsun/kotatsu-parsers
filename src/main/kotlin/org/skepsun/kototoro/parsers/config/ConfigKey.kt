@@ -40,4 +40,10 @@ public sealed class ConfigKey<T>(
 		public val presetValues: Map<String?, String?>,
 		override val defaultValue: String?,
 	) : ConfigKey<String?>("img_server")
+
+	public class Toggle(
+		key: String,
+		@JvmField public val title: String,
+		override val defaultValue: Boolean = false,
+	) : ConfigKey<Boolean>(key)
 }

@@ -5,9 +5,17 @@ import okhttp3.Headers
 import okhttp3.Interceptor
 import okhttp3.Response
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.MangaParserCredentialsAuthProvider
+import org.skepsun.kototoro.parsers.FavoritesProvider
+import org.skepsun.kototoro.parsers.FavoritesSyncProvider
+import org.skepsun.kototoro.parsers.network.GZipOptions
 import org.skepsun.kototoro.parsers.InternalParsersApi
 import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
@@ -18,14 +26,22 @@ import org.skepsun.kototoro.parsers.util.generateUid
 import org.skepsun.kototoro.parsers.util.getCookies
 import org.skepsun.kototoro.parsers.util.insertCookies
 import org.skepsun.kototoro.parsers.util.copyCookies
+import org.skepsun.kototoro.parsers.util.await
 import org.skepsun.kototoro.parsers.util.json.mapJSON
 import org.skepsun.kototoro.parsers.util.json.mapJSONIndexed
 import org.skepsun.kototoro.parsers.util.parseJson
+import org.skepsun.kototoro.parsers.util.parseRaw
 import org.skepsun.kototoro.parsers.util.urlEncoded
+import org.skepsun.kototoro.parsers.exception.AuthRequiredException
 import org.skepsun.kototoro.parsers.exception.ParseException
 import java.util.Base64
 import kotlin.random.Random
 import java.util.EnumSet
+import java.util.concurrent.atomic.AtomicReference
+import java.io.BufferedReader
+import java.io.ByteArrayInputStream
+import java.io.InputStreamReader
+import java.util.zip.GZIPInputStream
 
 import org.skepsun.kototoro.parsers.model.MangaTagGroup
 
@@ -37,7 +53,12 @@ import org.skepsun.kototoro.parsers.model.MangaTagGroup
 @OptIn(InternalParsersApi::class)
 @InternalParsersApi
 internal class CopyMangaParser(context: MangaLoaderContext) :
-    PagedMangaParser(context, MangaParserSource.COPYMANGA, pageSize = 30), Interceptor {
+    PagedMangaParser(context, MangaParserSource.COPYMANGA, pageSize = 30),
+    Interceptor,
+    MangaParserAuthProvider,
+    MangaParserCredentialsAuthProvider,
+    FavoritesProvider,
+    FavoritesSyncProvider {
     init {
         // 统一从第 1 页开始，以匹配 /comics?page=1 的分页策略
         paginator.firstPage = 1
@@ -50,7 +71,7 @@ internal class CopyMangaParser(context: MangaLoaderContext) :
         "api.copy2000.online",
     )
     @OptIn(InternalParsersApi::class)
-    override val userAgentKey = ConfigKey.UserAgent("COPY/3.0.6")
+    override val userAgentKey = ConfigKey.UserAgent("COPY/3.0.0")
     // 线路设置：海外(0)/大陆(1)，用于 Header 的 region 以及优先尝试的 line
     @OptIn(InternalParsersApi::class)
     private val preferredLineKey = ConfigKey.PreferredImageServer(
@@ -64,7 +85,9 @@ internal class CopyMangaParser(context: MangaLoaderContext) :
     private val deviceInfo: String by lazy { generateDeviceInfo() }
     private val device: String by lazy { generateDevice() }
     private val pseudoId: String by lazy { generatePseudoId() }
+    private val nicknameRef = AtomicReference<String?>()
     private var baseUrlOverride: String? = null
+    private var searchApiOverride: String? = null
     // 站点域（用于图片 Referer/Origin、HTML 回退等）
     private var siteDomainOverride: String? = null
     
@@ -159,7 +182,137 @@ internal class CopyMangaParser(context: MangaLoaderContext) :
     }
 
     // ===== 授权接口实现 =====
-    // 不实现账户登录与用户信息接口
+    override val authUrl: String = "https://www.mangacopy.com/login"
+
+    override suspend fun isAuthorized(): Boolean {
+        return getAuthToken() != null
+    }
+
+    private fun getAuthToken(): String? {
+        val base = apiBase()
+        val site = siteDomain()
+        val domains = setOf(base, site, "api.copy2000.online", "copy2000.online", "api.mangacopy.com", "mangacopy.com", "api.copy-manga.com", "copy-manga.com")
+        logAuth("getAuthToken: searching in domains=$domains")
+        for (domain in domains) {
+            val cookies = context.cookieJar.getCookies(domain)
+            val token = cookies.firstOrNull { it.name.equals("token", true) }?.value
+                ?: cookies.firstOrNull { it.name.equals("authorization", true) }?.value
+            if (!token.isNullOrEmpty()) {
+                logAuth("getAuthToken: found token in domain=$domain, value=${maskToken(token)}")
+                return token
+            }
+        }
+        logAuth("getAuthToken: token NOT found")
+        return null
+    }
+
+	override suspend fun getUsername(): String {
+		if (!isAuthorized()) throw AuthRequiredException(source)
+		nicknameRef.get()?.takeIf { it.isNotBlank() }?.let { 
+            logAuth("getUsername: cached user=$it")
+            return it 
+        }
+		val cookieName = "copy_nickname"
+		val domains = listOf(siteDomain(), apiBase(), "copy2000.online", "api.copy2000.online")
+		val fromCookie = domains.asSequence()
+			.mapNotNull { domain ->
+				val cookie = context.cookieJar.getCookies(domain).firstOrNull { it.name == cookieName }?.value
+                if (cookie != null) logAuth("getUsername: found nickname in domain=$domain")
+                cookie
+			}
+			.firstOrNull { it.isNotBlank() }
+		if (!fromCookie.isNullOrBlank()) {
+			nicknameRef.set(fromCookie)
+            logAuth("getUsername: found nickname in cookies=$fromCookie")
+			return fromCookie
+		}
+        logAuth("getUsername: nickname not found, fallback to User")
+		return "User"
+	}
+
+    override suspend fun login(username: String, password: String): Boolean {
+        val base = refreshAppApi()
+        val url = "https://$base/api/v3/login"
+        
+        val salt = Random.nextInt(1000, 10000).toString()
+        val encryptedPassword = Base64.getEncoder().encodeToString("$password-$salt".toByteArray(Charsets.UTF_8))
+        
+        // 与成功终端 curl (79字节) 严格对齐：
+        // 1. 不对 username 和 encryptedPassword 进行 urlEncoded
+        // 2. 在 password 后面紧跟字面量 \\n（两个字符，占 2 字节）
+        // 3. 使用 charset=utf-8
+        val bodyText = "username=$username&password=$encryptedPassword\\n&salt=$salt&authorization=Token+"
+        logAuth("CopyMangaDebug login: url=$url, body=${bodyText.replace(encryptedPassword, "******")}")
+
+        val requestHeaders = getRequestHeaders().newBuilder()
+            .add("Content-Type", "application/x-www-form-urlencoded;charset=utf-8")
+            .build()
+        
+        logAuth("CopyMangaDebug login: url=$url, body=${bodyText.replace(encryptedPassword, "******")}")
+        logAuth("CopyMangaDebug login: request headers (manual + base):")
+        for (i in 0 until requestHeaders.size) {
+            logAuth("  [${i}] ${requestHeaders.name(i)}: ${requestHeaders.value(i)}")
+        }
+
+        val bodyBytes = bodyText.toByteArray(Charsets.UTF_8)
+        logAuth("CopyMangaDebug login: body length=${bodyBytes.size} bytes (expected 79)")
+        val requestBody = bodyBytes.toRequestBody(null)
+        
+        // 使用 .tag(GZipOptions(skip = true)) 绕过全局 GZipInterceptor，彻底不发 Content-Encoding 头部
+        val request = Request.Builder()
+            .url(url)
+            .post(requestBody)
+            .headers(requestHeaders)
+            .tag(GZipOptions::class.java, GZipOptions(skip = true))
+            .build()
+
+        val response = try {
+            logAuth("CopyMangaDebug login: sending raw request via httpClient (forcing HTTP/1.1)")
+            // 强制使用 HTTP/1.1，因为终端 curl 默认行为更有可能被放行
+            val h1Client = context.httpClient.newBuilder()
+                .protocols(listOf(okhttp3.Protocol.HTTP_1_1))
+                .build()
+            h1Client.newCall(request).await()
+        } catch (e: Exception) {
+            logAuth("CopyMangaDebug login: exception during request: $e")
+            return false
+        }
+
+        val json = try {
+            logAuth("CopyMangaDebug login: parsing response JSON")
+            // 必须手动调用 unzip()，因为直接使用 context.httpClient 会绕过拦截器逻辑
+            response.unzip().parseJson()
+        } catch (e: Exception) {
+            logAuth("CopyMangaDebug login: JSON parse failed: $e")
+            return false
+        }
+        
+        logAuth("CopyMangaDebug login: response JSON=$json")
+
+        val token = json.optJSONObject("results")?.optString("token")
+        val nickname = json.optJSONObject("results")?.optString("nickname").orEmpty()
+        if (!token.isNullOrEmpty()) {
+            logAuth("CopyMangaDebug login: success, token=${maskToken(token)}")
+            val site = siteDomain()
+            // 使用更完整的 Cookie 属性以确保在子域和主域间共享
+            val cookieString = "token=$token; Domain=$site; Path=/; HttpOnly"
+            context.cookieJar.insertCookies(site, cookieString)
+            context.cookieJar.insertCookies(base, "token=$token; Domain=$base; Path=/; HttpOnly")
+            // 同时插入默认域以保证 getAuthToken 命中
+            context.cookieJar.insertCookies("copy2000.online", "token=$token; Domain=copy2000.online; Path=/")
+            
+            logAuth("CopyMangaDebug login: cookies inserted into $site, $base, and copy2000.online")
+            
+            if (nickname.isNotEmpty()) {
+                nicknameRef.set(nickname)
+                context.cookieJar.insertCookies(site, "copy_nickname=$nickname; Domain=$site; Path=/")
+                logAuth("CopyMangaDebug login: nickname saved: $nickname")
+            }
+            return true
+        }
+        logAuth("CopyMangaDebug login: failed (no token in results)")
+        return false
+    }
 
     @OptIn(InternalParsersApi::class)
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
@@ -209,28 +362,16 @@ override fun getRequestHeaders(): Headers {
     val dt = "$year.$month.$day"
 
     val apiDomain = apiBase()
-    var tokenCookie = context.cookieJar.getCookies(apiDomain).find {
-        it.name.equals("token", ignoreCase = true) || it.name.equals("authorization", ignoreCase = true)
-    }
-    if (tokenCookie == null) {
-        val site = siteDomain()
-        context.cookieJar.copyCookies(site, apiDomain, arrayOf("token", "authorization"))
-        tokenCookie = context.cookieJar.getCookies(apiDomain).find {
-            it.name.equals("token", ignoreCase = true) || it.name.equals("authorization", ignoreCase = true)
-        }
-    }
-    val authHeader = tokenCookie?.value?.let { v ->
-        if (v.isNotBlank()) "Token $v" else "Token"
-    } ?: "Token"
+    val authHeader = getAuthToken()?.let { v -> "Token $v" } ?: "Token"
 
     return Headers.Builder()
-        .add("User-Agent", "COPY/3.0.6")
+        .add("User-Agent", "COPY/3.0.0")
         .add("source", "copyApp")
         .add("deviceinfo", deviceInfo)
         .add("dt", dt)
         .add("platform", "3")
-        .add("referer", "com.copymanga.app-3.0.6")
-        .add("version", "3.0.6")
+        .add("referer", "com.copymanga.app-3.0.0")
+        .add("version", "3.0.0")
         .add("device", device)
         .add("pseudoid", pseudoId)
         .add("Accept", "application/json")
@@ -239,12 +380,109 @@ override fun getRequestHeaders(): Headers {
         .add("umstring", "b4c89ca4104ea9a97750314d791520ac")
         .add("x-auth-timestamp", ts)
         .add("x-auth-signature", sig)
+        // 魔法指纹：Content-Encoding 发送两次，夹着 Connection 和 Accept-Encoding
+        .add("Connection", "Keep-Alive")
+        .add("Accept-Encoding", "gzip")
+        .add("Host", apiDomain)
         .build()
 }
 
     @OptIn(InternalParsersApi::class)
     private fun apiBase(): String {
         return baseUrlOverride ?: config[configKeyDomain]
+    }
+
+    private suspend fun resolveComicUuid(pathWord: String, headers: Headers): String? {
+        val api = apiBase()
+        val url = "https://$api/api/v3/comic2/$pathWord?in_mainland=true&request_id=&platform=3"
+        val resp = webClient.httpGet(url.toHttpUrl(), headers)
+        if (!resp.isSuccessful) return null
+        return resp.parseJson().optJSONObject("results")?.optJSONObject("comic")?.optString("uuid")
+    }
+
+    override suspend fun fetchFavorites(): List<Manga> {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        val headers = getRequestHeaders()
+        val api = apiBase()
+        val result = mutableListOf<Manga>()
+        var offset = 0
+        val limit = 30
+        while (true) {
+            val url =
+                "https://$api/api/v3/member/collect/comics?limit=$limit&offset=$offset&free_type=1&ordering=-datetime_updated"
+            val resp = webClient.httpGet(url.toHttpUrl(), headers)
+            if (resp.code == 401) throw AuthRequiredException(source)
+            if (!resp.isSuccessful) break
+            val json = resp.parseJson()
+            val results = json.optJSONObject("results") ?: break
+            val list = results.optJSONArray("list") ?: JSONArray()
+            if (list.length() == 0) break
+            for (i in 0 until list.length()) {
+                val wrapper = list.optJSONObject(i) ?: continue
+                val comic = wrapper.optJSONObject("comic") ?: wrapper
+                val id = comic.optString("path_word")
+                val title = comic.optString("name")
+                val cover = comic.optString("cover")
+                val tags = (comic.optJSONArray("theme") ?: JSONArray()).mapJSON { t ->
+                    val n = t.optString("name")
+                    MangaTag(title = n, key = n, source = source)
+                }.toSet()
+                val authors = (comic.optJSONArray("author") ?: JSONArray()).mapJSON { a ->
+                    a.optString("name")
+                }.toSet()
+                val site = siteDomain()
+                result.add(
+                    Manga(
+                        id = generateUid(id),
+                        url = id,
+                        publicUrl = "https://$site/comic/$id",
+                        coverUrl = cover,
+                        title = title,
+                        altTitles = emptySet(),
+                        rating = RATING_UNKNOWN,
+                        tags = tags,
+                        authors = authors,
+                        state = null,
+                        source = source,
+                        contentRating = ContentRating.SAFE,
+                    )
+                )
+            }
+            val total = results.optInt("total", result.size)
+            offset += limit
+            if (offset >= total) break
+        }
+        return result
+    }
+
+    override suspend fun addFavorite(manga: Manga): Boolean {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        val headers = getRequestHeaders().newBuilder()
+            .add("Content-Type", "application/x-www-form-urlencoded;charset=utf-8")
+            .build()
+        val uuid = resolveComicUuid(manga.url, headers) ?: return false
+        val api = apiBase()
+        val tokenHeader = headers["authorization"] ?: "Token"
+        val body = "comic_id=$uuid&is_collect=1&authorization=${tokenHeader.removePrefix("Token ")}"
+        val url = "https://$api/api/v3/member/collect/comic"
+        val resp = webClient.httpPost(url.toHttpUrl(), body, headers)
+        if (resp.code == 401) throw AuthRequiredException(source)
+        return resp.isSuccessful
+    }
+
+    override suspend fun removeFavorite(manga: Manga): Boolean {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        val headers = getRequestHeaders().newBuilder()
+            .add("Content-Type", "application/x-www-form-urlencoded;charset=utf-8")
+            .build()
+        val uuid = resolveComicUuid(manga.url, headers) ?: return false
+        val api = apiBase()
+        val tokenHeader = headers["authorization"] ?: "Token"
+        val body = "comic_id=$uuid&is_collect=0&authorization=${tokenHeader.removePrefix("Token ")}"
+        val url = "https://$api/api/v3/member/collect/comic"
+        val resp = webClient.httpPost(url.toHttpUrl(), body, headers)
+        if (resp.code == 401) throw AuthRequiredException(source)
+        return resp.isSuccessful
     }
 
     // 刷新 API 端点（优先尝试发现接口，若失败则使用配置或回退域）
@@ -264,6 +502,10 @@ override fun getRequestHeaders(): Headers {
                 if (!api.isNullOrBlank()) {
                     baseUrlOverride = api
                     siteDomainOverride = if (api.startsWith("api.")) api.removePrefix("api.") else api
+                    
+                    // 同时尝试刷新搜索 API
+                    refreshSearchApi()
+                    
                     return api
                 }
             } catch (e: Exception) {
@@ -275,7 +517,28 @@ override fun getRequestHeaders(): Headers {
         baseUrlOverride = host
         // 同步推导站点域（移除 "api." 前缀）
         siteDomainOverride = if (host.startsWith("api.")) host.removePrefix("api.") else siteDomainOverride
+        refreshSearchApi()
         return host
+    }
+
+    private suspend fun refreshSearchApi() {
+        val url = "https://www.copy20.com/search"
+        try {
+            // 使用普通浏览器 User-Agent 访问网页，避免被 API 专属请求头拦截
+            val headers = Headers.Builder()
+                .add("User-Agent", UserAgents.CHROME_DESKTOP)
+                .build()
+            val resp = webClient.httpGet(url, headers)
+            if (resp.isSuccessful) {
+                val text = resp.parseRaw()
+                val match = Regex("""const countApi = "([^"]+)"""").find(text)
+                match?.groupValues?.get(1)?.let {
+                    searchApiOverride = it
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 
     // 移除登录与桥接方法
@@ -345,12 +608,12 @@ override fun getRequestHeaders(): Headers {
                 append("&free_type=1")
             }
         } else if (!filter.query.isNullOrEmpty()) {
-            // 搜索接口：优先 webAPI（copymanga.js 中 refreshSearchApi 可能改变路径），这里简化为统一 API
             val q = filter.query.urlEncoded()
+            val searchPath = searchApiOverride ?: BASE_SEARCH_API
             buildString {
                 append("https://")
                 append(base)
-                append(COPY_SEARCH_API)
+                append(searchPath)
                 append("?limit=")
                 append(pageSize)
                 append("&offset=")
@@ -358,8 +621,7 @@ override fun getRequestHeaders(): Headers {
                 append("&q=")
                 append(q)
                 append("&q_type=")
-                append("name")
-                append("&_update=true&free_type=1")
+                append("") // 默认空字符串，匹配全部或按 JS 逻辑
             }
         } else if (!filter.query.isNullOrEmpty() && filter.query.startsWith("作者:")) {
             val authorName = filter.query.removePrefix("作者:").trim()
@@ -378,10 +640,11 @@ override fun getRequestHeaders(): Headers {
                 }
             } else {
                 val q = authorName.urlEncoded()
+                val searchPath = searchApiOverride ?: BASE_SEARCH_API
                 buildString {
                     append("https://")
                     append(base)
-                    append(COPY_SEARCH_API)
+                    append(searchPath)
                     append("?limit=")
                     append(pageSize)
                     append("&offset=")
@@ -390,7 +653,6 @@ override fun getRequestHeaders(): Headers {
                     append(q)
                     append("&q_type=")
                     append("author")
-                    append("&_update=true&free_type=1")
                 }
             }
         } else {
@@ -865,12 +1127,47 @@ override fun getRequestHeaders(): Headers {
                 .build()
             val resp = chain.proceed(newReq)
             val ct = resp.header("Content-Type").orEmpty()
+            val decompressed = resp.unzip()
             return if (ct.contains("octet-stream", ignoreCase = true)) {
-                resp.newBuilder().header("Content-Type", "image/jpeg").build()
-            } else resp
+                decompressed.newBuilder().header("Content-Type", "image/jpeg").build()
+            } else decompressed
         } else {
-            chain.proceed(req)
+            return chain.proceed(req).unzip()
         }
+    }
+
+    /**
+     * 透明处理 GZIP 解压。
+     * 因为我们手动添加了 Accept-Encoding: gzip，OkHttp 会禁用其内置的透明解压逻辑。
+     */
+    @OptIn(InternalParsersApi::class)
+    private fun Response.unzip(): Response {
+        val contentEncoding = header("Content-Encoding")
+        if (contentEncoding?.contains("gzip", ignoreCase = true) != true) return this
+        val responseBody = body ?: return this
+        
+        return try {
+            val bytes = GZIPInputStream(responseBody.byteStream()).readBytes()
+            logAuth("unzip: decompressed ${responseBody.contentLength()} bytes to ${bytes.size} bytes")
+            val contentType = responseBody.contentType()
+            newBuilder()
+                .removeHeader("Content-Encoding")
+                .removeHeader("Content-Length")
+                .body(okhttp3.ResponseBody.create(contentType, bytes))
+                .build()
+        } catch (e: Exception) {
+            logAuth("unzip: decompression failed: $e")
+            this
+        }
+    }
+
+    private fun maskToken(token: String?): String {
+        if (token.isNullOrEmpty()) return ""
+        return if (token.length <= 8) token else token.take(4) + "..." + token.takeLast(4)
+    }
+
+    private fun logAuth(msg: String) {
+        kotlin.runCatching { println("[CopyMangaAuth] $msg") }
     }
 
     private fun generateDeviceInfo(): String {
@@ -908,7 +1205,8 @@ override fun getRequestHeaders(): Headers {
         // 默认使用海外线路（与 Python 校验一致）
         private const val DEFAULT_REGION = "1"
         private const val COPY_SECRET = "M2FmMDg1OTAzMTEwMzJlZmUwNjYwNTUwYTA1NjNhNTM="
-        private const val COPY_SEARCH_API = "/api/kb/web/searchb/comics"
+        private const val BASE_SEARCH_API = "/api/v3/search/comic"
+        private const val WEB_SEARCH_API = "/api/kb/web/searchb/comics"
         private val FALLBACK_DOMAINS = listOf(
             "api.copy2000.online",
             "api.copy2001.online",

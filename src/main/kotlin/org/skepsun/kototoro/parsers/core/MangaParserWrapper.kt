@@ -7,6 +7,8 @@ import okhttp3.Request
 import okhttp3.Response
 import org.skepsun.kototoro.parsers.MangaParser
 import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.FavoritesProvider
+import org.skepsun.kototoro.parsers.FavoritesSyncProvider
 import org.skepsun.kototoro.parsers.model.*
 import org.skepsun.kototoro.parsers.model.search.MangaSearchQuery
 import org.skepsun.kototoro.parsers.util.mergeWith
@@ -14,6 +16,9 @@ import org.skepsun.kototoro.parsers.util.mergeWith
 internal class MangaParserWrapper(
 	private val delegate: MangaParser,
 ) : MangaParser by delegate {
+
+	internal val favoritesProvider: FavoritesProvider? = delegate as? FavoritesProvider
+	internal val favoritesSyncProvider: FavoritesSyncProvider? = delegate as? FavoritesSyncProvider
 
 	override val authorizationProvider: MangaParserAuthProvider?
 		get() = delegate as? MangaParserAuthProvider

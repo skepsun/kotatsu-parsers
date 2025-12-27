@@ -11,10 +11,15 @@ import okhttp3.Headers
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.json.JSONObject
+import org.skepsun.kototoro.parsers.FavoritesProvider
+import org.skepsun.kototoro.parsers.FavoritesSyncProvider
 import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.MangaParserCredentialsAuthProvider
 import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.exception.AuthRequiredException
 import org.skepsun.kototoro.parsers.model.ContentType
 import org.skepsun.kototoro.parsers.model.Manga
 import org.skepsun.kototoro.parsers.model.MangaChapter
@@ -31,6 +36,8 @@ import org.skepsun.kototoro.parsers.network.UserAgents
 import org.skepsun.kototoro.parsers.util.generateUid
 import org.skepsun.kototoro.parsers.util.parseRaw
 import org.skepsun.kototoro.parsers.util.urlEncoded
+import org.skepsun.kototoro.parsers.util.getCookies
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.skepsun.kototoro.parsers.bitmap.Rect
 
 /**
@@ -44,7 +51,12 @@ import org.skepsun.kototoro.parsers.bitmap.Rect
 @MangaSourceParser("JMCOMIC", "禁漫天堂", "zh", type = ContentType.HENTAI_MANGA)
 internal class JmParser(
 	context: MangaLoaderContext,
-) : PagedMangaParser(context, MangaParserSource.JMCOMIC, pageSize = 80), Interceptor {
+) : PagedMangaParser(context, MangaParserSource.JMCOMIC, pageSize = 80), 
+    Interceptor, 
+    MangaParserAuthProvider, 
+    MangaParserCredentialsAuthProvider,
+    FavoritesProvider,
+    FavoritesSyncProvider {
 
     private val categoryTags = listOf(
         "最新A漫" to "0",
@@ -587,5 +599,74 @@ internal class JmParser(
                 imageHost = host
             }
         }
+    }
+
+    override val authUrl: String = "https://jmcomic.me/login"
+
+    override suspend fun isAuthorized(): Boolean {
+        // Checking for cookies on the active domain
+        return context.cookieJar.getCookies(activeDomain).any { it.name == "app_token" }
+    }
+
+    override suspend fun getUsername(): String {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        return "User"
+    }
+
+    override suspend fun login(username: String, password: String): Boolean {
+        val url = "$baseUrl/app/v1/login"
+        val body = mapOf(
+            "username" to username,
+            "password" to password,
+        )
+        
+        val response = try {
+            val time = (System.currentTimeMillis() / 1000).toString()
+            webClient.httpPost(url.toHttpUrl(), body, apiHeaders(time))
+        } catch (e: Exception) {
+            return false
+        }
+        
+        // JM post likely returns the same encrypted response
+        // But for login, we mainly care about cookies.
+        // Actually, looking at jm.js, it doesn't even parse the response.
+        return isAuthorized()
+    }
+
+    override suspend fun fetchFavorites(): List<Manga> {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        val result = mutableListOf<Manga>()
+        val order = "mr" // 默认按更新排序
+        var page = 1
+        val pageSize = 20
+        while (true) {
+            val url = "$baseUrl/favorite?folder_id=0&page=$page&o=$order"
+            val json = JSONObject(apiGet(url))
+            val list = json.optJSONArray("list") ?: break
+            if (list.length() == 0) break
+            for (i in 0 until list.length()) {
+                val obj = list.optJSONObject(i) ?: continue
+                parseComic(obj)?.let { result.add(it) }
+            }
+            val total = json.optInt("total", result.size)
+            if (page * pageSize >= total) break
+            page++
+        }
+        return result
+    }
+
+    override suspend fun addFavorite(manga: Manga): Boolean {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        val aid = manga.url.substringAfter("id=").substringBefore("&").ifBlank { manga.url }
+        val time = (System.currentTimeMillis() / 1000).toString()
+        val headers = apiHeaders(time)
+        val resp = webClient.httpPost("$baseUrl/favorite".toHttpUrl(), mapOf("aid" to aid), headers)
+        if (resp.code == 401) throw AuthRequiredException(source)
+        return resp.isSuccessful
+    }
+
+    override suspend fun removeFavorite(manga: Manga): Boolean {
+        // JM 使用同一接口切换收藏状态
+        return addFavorite(manga)
     }
 }

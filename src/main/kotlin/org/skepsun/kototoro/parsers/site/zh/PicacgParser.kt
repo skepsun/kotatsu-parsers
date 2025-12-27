@@ -12,6 +12,8 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.json.JSONArray
 import org.json.JSONObject
+import org.skepsun.kototoro.parsers.FavoritesProvider
+import org.skepsun.kototoro.parsers.FavoritesSyncProvider
 import org.skepsun.kototoro.parsers.MangaLoaderContext
 // import org.skepsun.kototoro.parsers.Broken
 import org.skepsun.kototoro.parsers.MangaParserAuthProvider
@@ -30,12 +32,15 @@ import org.skepsun.kototoro.parsers.model.MangaListFilterOptions
 import org.skepsun.kototoro.parsers.model.MangaPage
 import org.skepsun.kototoro.parsers.model.MangaParserSource
 import org.skepsun.kototoro.parsers.model.MangaTag
+import org.skepsun.kototoro.parsers.model.MangaTagGroup
 import org.skepsun.kototoro.parsers.model.RATING_UNKNOWN
 import org.skepsun.kototoro.parsers.model.SortOrder
+import org.skepsun.kototoro.parsers.model.ContentRating
 import org.skepsun.kototoro.parsers.network.UserAgents
 import org.skepsun.kototoro.parsers.util.generateUid
 import org.skepsun.kototoro.parsers.util.getCookies
 import org.skepsun.kototoro.parsers.util.insertCookies
+import org.skepsun.kototoro.parsers.util.json.mapJSON
 import org.skepsun.kototoro.parsers.util.map
 import org.skepsun.kototoro.parsers.util.mapNotNullToSet
 import org.skepsun.kototoro.parsers.util.parseJson
@@ -62,7 +67,7 @@ import java.net.CookiePolicy
 // @Broken("Temporarily disabled per release 9.4.2 requirements")
 @MangaSourceParser("PICACG", "Picacg", "zh", type = ContentType.HENTAI_MANGA)
 internal class PicacgParser(context: MangaLoaderContext) :
-    PagedMangaParser(context, MangaParserSource.PICACG, pageSize = 24), Interceptor, MangaParserAuthProvider, MangaParserCredentialsAuthProvider {
+    PagedMangaParser(context, MangaParserSource.PICACG, pageSize = 24), Interceptor, MangaParserAuthProvider, MangaParserCredentialsAuthProvider, FavoritesProvider, FavoritesSyncProvider {
 
     // 默认使用官方域名，并保留旧域作为备选，方便在设置中切换
     override val configKeyDomain = ConfigKey.Domain(
@@ -119,9 +124,14 @@ internal class PicacgParser(context: MangaLoaderContext) :
     override suspend fun getFilterOptions(): MangaListFilterOptions = try {
         val dynamicTags = fetchAvailableKeywords()
         val allTags = (dynamicTags + staticCategoryTags)
+        val groups = buildList<MangaTagGroup> {
+            if (staticCategoryTags.isNotEmpty()) add(MangaTagGroup("分类", staticCategoryTags))
+            if (dynamicTags.isNotEmpty()) add(MangaTagGroup("关键词", dynamicTags))
+        }
         MangaListFilterOptions(
             availableTags = allTags,
-            availableLocales = setOf(Locale.CHINESE)
+            availableLocales = setOf(Locale.CHINESE),
+            tagGroups = groups,
         )
     } catch (_: Exception) {
         MangaListFilterOptions(
@@ -519,6 +529,86 @@ internal class PicacgParser(context: MangaLoaderContext) :
         return true
     }
 
+    override suspend fun fetchFavorites(): List<Manga> {
+        val t = getAuthToken()
+        if (t.isNullOrBlank()) throw AuthRequiredException(source)
+        val results = mutableListOf<Manga>()
+        var page = 1
+        while (true) {
+            val path = "users/favourite?page=$page&s="
+            val resp = webClient.httpGet("$baseUrl/$path", buildApiHeaders("GET", path))
+            if (resp.code == 401) throw AuthRequiredException(source)
+            if (!resp.isSuccessful) break
+            val json = resp.parseJson()
+            val comics = json.optJSONObject("data")
+                ?.optJSONObject("comics")
+                ?: break
+            val docs = comics.optJSONArray("docs") ?: JSONArray()
+            if (docs.length() == 0) break
+            for (i in 0 until docs.length()) {
+                val c = docs.optJSONObject(i) ?: continue
+                val cid = c.optString("_id").ifEmpty { c.optString("id") }
+                if (cid.isEmpty()) continue
+                val title = c.optString("title")
+                val cover = c.optJSONObject("thumb")?.let { thumb ->
+                    val server = thumb.optString("fileServer")
+                    val pathImg = thumb.optString("path")
+                    if (server.isNotEmpty() && pathImg.isNotEmpty()) "$server/static/$pathImg" else ""
+                }.orEmpty()
+                val tagsArr = c.optJSONArray("tags") ?: JSONArray()
+                val tags = mutableSetOf<MangaTag>().apply {
+                    for (ti in 0 until tagsArr.length()) {
+                        val n = tagsArr.optString(ti)
+                        if (n.isNotEmpty()) add(MangaTag(n, n, source))
+                    }
+                }
+                val authorsArr = c.optJSONArray("author") ?: JSONArray()
+                val authors = mutableSetOf<String>().apply {
+                    for (ai in 0 until authorsArr.length()) {
+                        val a = authorsArr.optString(ai)
+                        if (a.isNotEmpty()) add(a)
+                    }
+                }
+                results.add(
+                    Manga(
+                        id = generateUid(cid),
+                        url = cid,
+                        publicUrl = "https://$domain/comic/$cid",
+                        coverUrl = cover,
+                        title = title,
+                        altTitles = emptySet(),
+                        rating = RATING_UNKNOWN,
+                        tags = tags,
+                        authors = authors,
+                        state = null,
+                        source = source,
+                        contentRating = ContentRating.ADULT,
+                    )
+                )
+            }
+            val pages = comics.optInt("pages", page)
+            if (page >= pages) break
+            page += 1
+            delay(200)
+        }
+        return results
+    }
+
+    override suspend fun addFavorite(manga: Manga): Boolean {
+        val t = getAuthToken()
+        if (t.isNullOrBlank()) throw AuthRequiredException(source)
+        val path = "comics/${manga.url}/favourite"
+        val headers = buildApiHeaders("POST", path)
+        val resp = webClient.httpPost("$baseUrl/$path".toHttpUrl(), JSONObject(), headers)
+        if (resp.code == 401) throw AuthRequiredException(source)
+        return resp.isSuccessful
+    }
+
+    override suspend fun removeFavorite(manga: Manga): Boolean {
+        // Picacg 使用同一接口 toggle，传空体即可取消
+        return addFavorite(manga)
+    }
+
     private data class NativeResponse(val code: Int, val body: String, val headers: Map<String, String>)
 
     private fun httpPostNative(url: String, headers: Headers, bodyJson: JSONObject): NativeResponse {
@@ -758,6 +848,7 @@ internal class PicacgParser(context: MangaLoaderContext) :
         catsArr.forEachString { t ->
             if (t.isNotBlank()) tagSet[t] = MangaTag(title = t, key = t.lowercase(Locale.ROOT), source = source)
         }
+        val rating = guessContentRating(tagSet.keys) ?: ContentRating.ADULT
         return Manga(
             id = id,
             title = title,
@@ -765,7 +856,7 @@ internal class PicacgParser(context: MangaLoaderContext) :
             url = idStr,
             publicUrl = "$baseUrl/comics/$idStr",
             rating = RATING_UNKNOWN,
-            contentRating = null,
+            contentRating = rating,
             coverUrl = cover,
             tags = tagSet.values.toSet(),
             state = null,
@@ -807,6 +898,7 @@ internal class PicacgParser(context: MangaLoaderContext) :
         val tagSet = ArrayMap<String, MangaTag>()
         catsArr.forEachString { t -> if (t.isNotBlank()) tagSet[t] = MangaTag(t, t.lowercase(Locale.ROOT), source) }
         tagsArr.forEachString { t -> if (t.isNotBlank()) tagSet[t] = MangaTag(t, t.lowercase(Locale.ROOT), source) }
+        val rating = guessContentRating(tagSet.keys) ?: manga.contentRating ?: ContentRating.ADULT
 
         // Load chapters (eps)
         val chapters = coroutineScope {
@@ -853,6 +945,7 @@ internal class PicacgParser(context: MangaLoaderContext) :
             coverUrl = cover ?: manga.coverUrl,
             tags = tagSet.values.toSet(),
             chapters = chapters,
+            contentRating = rating,
         )
     }
 
@@ -887,6 +980,13 @@ internal class PicacgParser(context: MangaLoaderContext) :
             i++
         }
         return pages
+    }
+
+    private fun guessContentRating(tagNames: Collection<String>): ContentRating? {
+        if (tagNames.isEmpty()) return null
+        val lower = tagNames.map { it.lowercase(Locale.ROOT) }
+        val adultKeys = setOf("r18", "18+", "紳士", "绅士", "工口", "h漫", "本子", "成人", "限制", "情色", "里番", "nsfw", "smut")
+        return if (lower.any { s -> adultKeys.any { key -> s.contains(key) } }) ContentRating.ADULT else null
     }
 
     // Helpers for JSON arrays of strings

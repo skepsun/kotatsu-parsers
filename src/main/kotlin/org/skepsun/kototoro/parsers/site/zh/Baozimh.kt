@@ -4,22 +4,38 @@ import androidx.collection.ArrayMap
 import okhttp3.Headers
 import org.json.JSONArray
 import org.jsoup.nodes.Document
+import org.skepsun.kototoro.parsers.FavoritesProvider
 import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.MangaParserCredentialsAuthProvider
+import org.skepsun.kototoro.parsers.FavoritesSyncProvider
 import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.exception.AuthRequiredException
 import org.skepsun.kototoro.parsers.exception.ParseException
 import org.skepsun.kototoro.parsers.model.*
 import org.skepsun.kototoro.parsers.network.CloudFlareHelper
 import org.skepsun.kototoro.parsers.network.UserAgents
 import org.skepsun.kototoro.parsers.util.*
+import org.skepsun.kototoro.parsers.util.getCookies
+import org.skepsun.kototoro.parsers.util.insertCookies
+import org.skepsun.kototoro.parsers.util.parseJson
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.Request
+import okhttp3.MultipartBody
+import org.skepsun.kototoro.parsers.util.await
 import org.skepsun.kototoro.parsers.util.json.mapJSON
 import org.skepsun.kototoro.parsers.util.suspendlazy.suspendLazy
 import java.util.*
 
 @MangaSourceParser("BAOZIMH", "包子漫画", "zh")
 internal class Baozimh(context: MangaLoaderContext) :
-	PagedMangaParser(context, MangaParserSource.BAOZIMH, pageSize = 36) {
+	PagedMangaParser(context, MangaParserSource.BAOZIMH, pageSize = 36),
+	MangaParserAuthProvider,
+	MangaParserCredentialsAuthProvider,
+	FavoritesProvider,
+	FavoritesSyncProvider {
 
 	override val configKeyDomain = ConfigKey.Domain(
 		"bzmgcn.com",
@@ -301,5 +317,113 @@ internal class Baozimh(context: MangaLoaderContext) :
 				source = source,
 			)
 		}
+	}
+
+	override val authUrl: String = "https://$baseUrl/user/login"
+
+	override suspend fun isAuthorized(): Boolean {
+		return context.cookieJar.getCookies(baseUrl).any { it.name == "TSID" }
+	}
+
+	override suspend fun getUsername(): String {
+		if (!isAuthorized()) throw AuthRequiredException(source)
+		return "User"
+	}
+
+	override suspend fun login(username: String, password: String): Boolean {
+		val url = "https://$baseUrl/api/bui/signin"
+		val body = MultipartBody.Builder()
+			.setType(MultipartBody.FORM)
+			.addFormDataPart("username", username)
+			.addFormDataPart("password", password)
+			.build()
+		
+		val request = Request.Builder()
+			.url(url)
+			.post(body)
+			.headers(getRequestHeaders())
+			.build()
+
+		val response = try {
+			context.httpClient.newCall(request).await()
+		} catch (e: Exception) {
+			return false
+		}
+		
+		val json = response.parseJson()
+		val token = json.optString("data")
+		if (!token.isNullOrEmpty()) {
+			context.cookieJar.insertCookies(baseUrl, "TSID=$token; Domain=$baseUrl; Path=/; HttpOnly")
+			return true
+		}
+		return false
+	}
+
+	override suspend fun fetchFavorites(): List<Manga> {
+		if (!isAuthorized()) throw AuthRequiredException(source)
+		val headers = Headers.Builder()
+			.add("User-Agent", config[userAgentKey])
+			.add("referer", "https://$baseUrl/")
+			.build()
+		val url = "https://$baseUrl/user/my_bookshelf"
+		val resp = webClient.httpGet(url, headers)
+		if (resp.code == 401) throw AuthRequiredException(source)
+		if (!resp.isSuccessful) return emptyList()
+		val doc = resp.parseHtml()
+		val items = doc.select("div.bookshelf-items")
+		if (items.isEmpty()) return emptyList()
+		return items.mapNotNull { el ->
+			val link = el.selectFirst("h4 > a") ?: return@mapNotNull null
+			val href = link.attr("href")
+			val id = href.substringAfterLast('/').substringBefore('?').substringBefore("#").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+			val title = link.text().trim()
+			val infoList = el.selectFirst("div.info > ul")
+			val author = infoList?.children()?.getOrNull(1)?.text()?.substringAfter("：")?.trim().orEmpty()
+			val desc = infoList?.children()?.getOrNull(4)?.children()?.firstOrNull()?.text()?.trim().orEmpty()
+			val cover = el.selectFirst("amp-img")?.attr("src")
+				?: el.selectFirst("img")?.let { img ->
+					img.attr("data-src").ifEmpty { img.attr("src") }
+				}
+			val absCover = cover?.let { if (it.startsWith("http")) it else "https:$it" }
+			Manga(
+				id = generateUid(id),
+				url = "/comic/$id",
+				publicUrl = "https://$baseUrl/comic/$id",
+				coverUrl = absCover,
+				title = title,
+				altTitles = emptySet(),
+				rating = RATING_UNKNOWN,
+				tags = emptySet(),
+				authors = if (author.isNotEmpty()) setOf(author) else emptySet(),
+				state = null,
+				description = desc.ifEmpty { null },
+				source = source,
+				contentRating = ContentRating.SAFE,
+			)
+		}
+	}
+
+	override suspend fun addFavorite(manga: Manga): Boolean {
+		if (!isAuthorized()) throw AuthRequiredException(source)
+		val headers = Headers.Builder()
+			.add("User-Agent", config[userAgentKey])
+			.add("referer", "https://$baseUrl/")
+			.build()
+		val url = "https://$baseUrl/user/operation_v2?op=set_bookmark&comic_id=${manga.url}&chapter_slot=0"
+		val resp = webClient.httpPost(url.toHttpUrl(), emptyMap<String, String>(), headers)
+		if (resp.code == 401) throw AuthRequiredException(source)
+		return resp.isSuccessful
+	}
+
+	override suspend fun removeFavorite(manga: Manga): Boolean {
+		if (!isAuthorized()) throw AuthRequiredException(source)
+		val headers = Headers.Builder()
+			.add("User-Agent", config[userAgentKey])
+			.add("referer", "https://$baseUrl/")
+			.build()
+		val url = "https://$baseUrl/user/operation_v2?op=del_bookmark&comic_id=${manga.url}"
+		val resp = webClient.httpPost(url.toHttpUrl(), emptyMap<String, String>(), headers)
+		if (resp.code == 401) throw AuthRequiredException(source)
+		return resp.isSuccessful
 	}
 }

@@ -3,10 +3,15 @@ package org.skepsun.kototoro.parsers.site.zh
 import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
+import org.skepsun.kototoro.parsers.FavoritesProvider
+import org.skepsun.kototoro.parsers.FavoritesSyncProvider
 import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.MangaParserCredentialsAuthProvider
 import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.exception.AuthRequiredException
 import org.skepsun.kototoro.parsers.model.*
 import org.skepsun.kototoro.parsers.util.generateUid
 import org.skepsun.kototoro.parsers.util.json.mapJSON
@@ -14,7 +19,9 @@ import org.skepsun.kototoro.parsers.util.json.mapJSONIndexed
 import org.skepsun.kototoro.parsers.util.json.mapJSONNotNull
 import org.skepsun.kototoro.parsers.util.toAbsoluteUrl
 import org.skepsun.kototoro.parsers.util.parseJson
+import org.skepsun.kototoro.parsers.util.parseJsonObject
 import org.skepsun.kototoro.parsers.util.getCookies
+import org.skepsun.kototoro.parsers.util.insertCookies
 import java.util.*
 import okhttp3.Headers
 import org.skepsun.kototoro.parsers.network.UserAgents
@@ -33,7 +40,11 @@ import org.skepsun.kototoro.parsers.util.runCatchingCancellable
 
 @MangaSourceParser("KOMIIC", "Komiic", "zh")
 internal class KomiicParser(context: MangaLoaderContext) :
-    PagedMangaParser(context, MangaParserSource.KOMIIC, pageSize = 20) {
+    PagedMangaParser(context, MangaParserSource.KOMIIC, pageSize = 20),
+    MangaParserAuthProvider,
+    MangaParserCredentialsAuthProvider,
+    FavoritesProvider,
+    FavoritesSyncProvider {
 
     override val configKeyDomain = ConfigKey.Domain("komiic.com")
 
@@ -857,5 +868,220 @@ internal class KomiicParser(context: MangaLoaderContext) :
                 "https://${domain}/",
             )
         }
+    }
+
+    override val authUrl: String = "https://komiic.com/login"
+
+    override suspend fun isAuthorized(): Boolean {
+        return context.cookieJar.getCookies("komiic.com").any { it.name == "token" }
+    }
+
+    override suspend fun getUsername(): String {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        // Try to fetch user profile if needed, or return a placeholder
+        return "User"
+    }
+
+    override suspend fun login(username: String, password: String): Boolean {
+        val url = "https://${domain}/api/login"
+        val body = JSONObject().apply {
+            put("email", username)
+            put("password", password)
+        }
+        val headers = getRequestHeaders().newBuilder()
+            .add("Content-Type", "application/json")
+            .add("Accept", "application/json")
+            .add("Origin", "https://${domain}")
+            .add("Referer", "https://${domain}/login")
+            .build()
+
+        val res = runCatching { webClient.httpPost(url.toHttpUrl(), body, headers) }.getOrElse { return false }
+        if (!res.isSuccessful) return false
+        val json = res.parseJsonObject()
+        val token = json.optString("token")
+            .ifEmpty { json.optJSONObject("results")?.optString("token").orEmpty() }
+            .ifEmpty { json.optJSONObject("data")?.optString("token").orEmpty() }
+        if (!token.isNullOrEmpty()) {
+            context.cookieJar.insertCookies(domain, "token=$token; Domain=${domain}; Path=/; HttpOnly")
+            return true
+        }
+        return false
+    }
+
+    override suspend fun fetchFavorites(): List<Manga> {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        // 1) 获取收藏夹列表
+        val folderQuery = """
+            query myFolder {
+              folders {
+                id
+                name
+              }
+            }
+        """.trimIndent()
+        val foldersData = apiCall(folderQuery, "myFolder", null)
+        val foldersArr = foldersData.optJSONArray("folders") ?: JSONArray()
+        if (foldersArr.length() == 0) return emptyList()
+
+        val allIds = mutableSetOf<String>()
+        // 2) 遍历收藏夹获取漫画 ID（分页，每次 30）
+        for (i in 0 until foldersArr.length()) {
+            val folder = foldersArr.optJSONObject(i) ?: continue
+            val folderId = folder.optString("id")
+            if (folderId.isEmpty()) continue
+            var offset = 0
+            val limit = 30
+            while (true) {
+                val variables = JSONObject().apply {
+                    put("folderId", folderId)
+                    put(
+                        "pagination",
+                        JSONObject().apply {
+                            put("limit", limit)
+                            put("offset", offset)
+                            put("orderBy", "DATE_UPDATED")
+                            put("status", "")
+                            put("asc", true)
+                        }
+                    )
+                }
+                val q = """
+                    query folderComicIds(${'$'}folderId: ID!, ${'$'}pagination: Pagination!) {
+                      folderComicIds(folderId: ${'$'}folderId, pagination: ${'$'}pagination) {
+                        comicIds
+                      }
+                    }
+                """.trimIndent()
+                val data = apiCall(q, "folderComicIds", variables)
+                val ids = data.optJSONObject("folderComicIds")?.optJSONArray("comicIds") ?: JSONArray()
+                if (ids.length() == 0) break
+                for (j in 0 until ids.length()) {
+                    val id = ids.optString(j)
+                    if (id.isNotEmpty()) allIds.add(id)
+                }
+                if (ids.length() < limit) break
+                offset += limit
+            }
+        }
+
+        if (allIds.isEmpty()) return emptyList()
+
+        // 3) 按批查询漫画详情
+        val result = mutableListOf<Manga>()
+        val idsList = allIds.toList()
+        val chunkSize = 30
+        val site = domain
+        for (chunkStart in idsList.indices step chunkSize) {
+            val chunk = idsList.subList(chunkStart, kotlin.math.min(chunkStart + chunkSize, idsList.size))
+            val variables = JSONObject().apply {
+                put("comicIds", JSONArray(chunk))
+            }
+            val q = """
+                query comicByIds(${'$'}comicIds: [ID]!) {
+                  comicByIds(comicIds: ${'$'}comicIds) {
+                    id
+                    title
+                    imageUrl
+                    authors { name }
+                    categories { name }
+                    dateUpdated
+                  }
+                }
+            """.trimIndent()
+            val data = apiCall(q, "comicByIds", variables)
+            val arr = data.optJSONArray("comicByIds") ?: continue
+            for (k in 0 until arr.length()) {
+                val c = arr.optJSONObject(k) ?: continue
+                val cid = c.optString("id")
+                if (cid.isEmpty()) continue
+                val title = c.optString("title")
+                val cover = c.optString("imageUrl")
+                val authors = (c.optJSONArray("authors") ?: JSONArray()).mapJSONNotNull { a ->
+                    a.optString("name").takeIf { it.isNotEmpty() }
+                }.toSet()
+                val tags = (c.optJSONArray("categories") ?: JSONArray()).mapJSONNotNull { t ->
+                    t.optString("name").takeIf { it.isNotEmpty() }?.let { MangaTag(it, it, source) }
+                }.toSet()
+                result.add(
+                    Manga(
+                        id = generateUid(cid),
+                        url = cid,
+                        publicUrl = "https://$site/comic/$cid",
+                        coverUrl = cover,
+                        title = title,
+                        altTitles = emptySet(),
+                        rating = RATING_UNKNOWN,
+                        tags = tags,
+                        authors = authors,
+                        state = null,
+                        source = source,
+                        contentRating = ContentRating.SAFE,
+                    )
+                )
+            }
+        }
+        return result
+    }
+
+    private suspend fun ensureDefaultFolderId(): String {
+        val folderQuery = """
+            query myFolder {
+              folders { id name }
+            }
+        """.trimIndent()
+        val data = apiCall(folderQuery, "myFolder", null)
+        val folders = data.optJSONArray("folders") ?: JSONArray()
+        if (folders.length() > 0) {
+            return folders.optJSONObject(0)?.optString("id").orEmpty().ifEmpty {
+                // fall through to create
+                createFolder("default")
+            }
+        }
+        return createFolder("default")
+    }
+
+    private suspend fun createFolder(name: String): String {
+        val q = """
+            mutation createFolder(${'$'}name: String!) {
+              createFolder(name: ${'$'}name) { id name }
+            }
+        """.trimIndent()
+        val vars = JSONObject().apply { put("name", name) }
+        val data = apiCall(q, "createFolder", vars)
+        return data.optJSONObject("createFolder")?.optString("id").orEmpty()
+    }
+
+    override suspend fun addFavorite(manga: Manga): Boolean {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        val folderId = ensureDefaultFolderId()
+        if (folderId.isEmpty()) return false
+        val q = """
+            mutation addComicToFolder(${'$'}comicId: ID!, ${'$'}folderId: ID!) {
+              addComicToFolder(comicId: ${'$'}comicId, folderId: ${'$'}folderId)
+            }
+        """.trimIndent()
+        val vars = JSONObject().apply {
+            put("comicId", manga.url)
+            put("folderId", folderId)
+        }
+        val data = apiCall(q, "addComicToFolder", vars)
+        val ok = data.optBoolean("addComicToFolder", false)
+        return ok
+    }
+
+    override suspend fun removeFavorite(manga: Manga): Boolean {
+        if (!isAuthorized()) throw AuthRequiredException(source)
+        val q = """
+            mutation removeComicToFolder(${'$'}comicId: ID!, ${'$'}folderId: ID!) {
+              removeComicToFolder(comicId: ${'$'}comicId, folderId: ${'$'}folderId)
+            }
+        """.trimIndent()
+        val vars = JSONObject().apply {
+            put("comicId", manga.url)
+            // API 允许不指定文件夹则全部移除，传空字符串
+            put("folderId", "")
+        }
+        val data = apiCall(q, "removeComicToFolder", vars)
+        return data.optBoolean("removeComicToFolder", false)
     }
 }

@@ -31,6 +31,11 @@ public abstract class MangaLoaderContext {
 	public open fun getPreferredLocales(): List<Locale> = listOf(Locale.getDefault())
 
 	/**
+	 * Optional user-facing notification, default no-op for non-Android environments.
+	 */
+	public open fun showToast(message: String, isLong: Boolean = false) {}
+
+	/**
 	 * Execute JavaScript code and return result
 	 * @param script JavaScript source code
 	 * @return execution result as string, may be null

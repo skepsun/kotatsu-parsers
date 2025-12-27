@@ -138,49 +138,87 @@ internal class LightNovelWiki(context: MangaLoaderContext) :
         }
 
         // Chapters
-        val chapters = mutableListOf<MangaChapter>()
-        val accordionItems = doc.select(".accordion-item")
-        var volumeIndex = 0
+        val allChapters = mutableListOf<MangaChapter>()
+        val accordionItems = doc.select(".accordion-item").sortedBy { item ->
+            val target = item.selectFirst(".accordion-button")?.attr("data-bs-target")
+                ?: item.selectFirst(".accordion-collapse")?.id()
+                ?: ""
+            // Extract the 'n' from 'volumes-n' or '#volumes-n'
+            Regex("""\d+""").find(target)?.value?.toIntOrNull() ?: Int.MAX_VALUE
+        }
         
+        val addedUrls = mutableSetOf<String>()
         if (accordionItems.isNotEmpty()) {
+            var currentVolume = 0
             accordionItems.forEach { item ->
-                val volumeName = item.selectFirst(".accordion-header, .accordion-button")?.text()?.trim()
+                val headerElement = item.selectFirst(".accordion-header, .accordion-button")
+                val volumeName = headerElement?.text()?.trim() ?: ""
+                val volumeUrl = headerElement?.attr("href")?.takeIf { it.isNotBlank() }?.toRelativeUrl(domain)
+                
+                currentVolume++
+                
+                // Get sub-chapters inside the volume
                 val chapterLinks = item.select(".accordion-body a[href], .accordion-collapse a[href]")
                 
-                chapterLinks.forEach { element ->
-                    val cUrl = element.attr("href").toRelativeUrl(domain)
-                    val cTitle = element.text().trim()
-                    chapters.add(MangaChapter(
-                        id = generateUid(cUrl),
-                        title = cTitle,
-                        number = chapters.size + 1f,
-                        volume = volumeIndex + 1,
-                        url = cUrl,
-                        scanlator = null,
+                // 1. Resolve title collision: If the volume header link matches a sub-chapter, use the sub-chapter's better title
+                if (volumeUrl != null && volumeUrl !in addedUrls) {
+                    val matchingSubChapter = chapterLinks.find { it.attr("href").toRelativeUrl(domain) == volumeUrl }
+                    val finalTitle = matchingSubChapter?.text()?.trim() ?: volumeName
+                    
+                    allChapters.add(MangaChapter(
+                        id = generateUid(volumeUrl),
+                        title = finalTitle,
+                        number = allChapters.size + 1f,
+                        volume = currentVolume,
+                        url = volumeUrl,
+                        scanlator = volumeName, // Store volume name for custom headers
                         uploadDate = 0L,
-                        branch = volumeName,
+                        branch = null, // Set to null for single list order
                         source = source
                     ))
+                    addedUrls.add(volumeUrl)
                 }
-                volumeIndex++
+                
+                // 2. Add all other sub-chapters in order
+                chapterLinks.forEach { element ->
+                    val cUrl = element.attr("href").toRelativeUrl(domain)
+                    if (cUrl !in addedUrls) {
+                        val cTitle = element.text().trim()
+                        allChapters.add(MangaChapter(
+                            id = generateUid(cUrl),
+                            title = cTitle,
+                            number = allChapters.size + 1f,
+                            volume = currentVolume,
+                            url = cUrl,
+                            scanlator = volumeName, // Store volume name for custom headers
+                            uploadDate = 0L,
+                            branch = null, // Set to null for single list order
+                            source = source
+                        ))
+                        addedUrls.add(cUrl)
+                    }
+                }
             }
         } else {
             // Fallback for flat structure
             val chapterElements = doc.select(".accordion-item a[href], .chapter-list a[href], .card-body a[href]")
             chapterElements.forEachIndexed { index, element ->
                 val cUrl = element.attr("href").toRelativeUrl(domain)
-                val cTitle = element.text().trim()
-                chapters.add(MangaChapter(
-                    id = generateUid(cUrl),
-                    title = cTitle,
-                    number = index + 1f,
-                    volume = 0,
-                    url = cUrl,
-                    scanlator = null,
-                    uploadDate = 0L,
-                    branch = null,
-                    source = source
-                ))
+                if (cUrl !in addedUrls) {
+                    val cTitle = element.text().trim()
+                    allChapters.add(MangaChapter(
+                        id = generateUid(cUrl),
+                        title = cTitle,
+                        number = allChapters.size + 1f,
+                        volume = 0,
+                        url = cUrl,
+                        scanlator = null,
+                        uploadDate = 0L,
+                        branch = null,
+                        source = source
+                    ))
+                    addedUrls.add(cUrl)
+                }
             }
         }
 
@@ -190,7 +228,7 @@ internal class LightNovelWiki(context: MangaLoaderContext) :
             authors = if (author != null) setOf(author) else manga.authors,
             description = intro,
             tags = tagsSet,
-            chapters = chapters
+            chapters = allChapters
         )
     }
 

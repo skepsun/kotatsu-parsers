@@ -6,9 +6,12 @@ import okhttp3.Response
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.FavoritesProvider
+import org.skepsun.kototoro.parsers.FavoritesSyncProvider
 import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.exception.AuthRequiredException
 import org.skepsun.kototoro.parsers.model.ContentRating
 import org.skepsun.kototoro.parsers.model.ContentType
 import org.skepsun.kototoro.parsers.model.Manga
@@ -24,6 +27,7 @@ import org.skepsun.kototoro.parsers.model.SortOrder
 import org.skepsun.kototoro.parsers.network.UserAgents
 import org.skepsun.kototoro.parsers.util.attrAsRelativeUrl
 import org.skepsun.kototoro.parsers.util.generateUid
+import org.skepsun.kototoro.parsers.util.getCookies
 import org.skepsun.kototoro.parsers.util.mapToSet
 import org.skepsun.kototoro.parsers.util.parseHtml
 import org.skepsun.kototoro.parsers.util.parseRaw
@@ -33,12 +37,15 @@ import org.skepsun.kototoro.parsers.util.urlEncoded
 import java.util.EnumSet
 import java.util.Locale
 import kotlinx.coroutines.delay
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import kotlin.random.Random
 import org.jsoup.HttpStatusException
 
 @MangaSourceParser("WNACG", "紳士漫畫", "zh", type = ContentType.HENTAI_MANGA)
 internal class WnacgParser(context: MangaLoaderContext) :
-    PagedMangaParser(context, MangaParserSource.WNACG, 30) {
+    PagedMangaParser(context, MangaParserSource.WNACG, 30),
+    FavoritesProvider,
+    FavoritesSyncProvider {
 
     override val configKeyDomain = ConfigKey.Domain("www.wnacg.com")
     override val userAgentKey = ConfigKey.UserAgent(UserAgents.CHROME_DESKTOP)
@@ -672,5 +679,171 @@ internal class WnacgParser(context: MangaLoaderContext) :
         val sub = url.substring(start + 5)
         val end = sub.indexOf('.')
         return if (end == -1) sub.filter { it.isDigit() } else sub.substring(0, end).filter { it.isDigit() }
+    }
+
+    override suspend fun fetchFavorites(): List<Manga> {
+        val headers = authorizedHeaders()
+        val folders = loadFavoriteFolders(headers)
+        // 没有文件夹时，也尝试默认文件夹 0
+        val folderEntries = if (folders.isEmpty()) listOf(null to "0") else folders.map { it.value to it.key }
+        val result = mutableListOf<Manga>()
+        for ((folderName, folderId) in folderEntries) {
+            var page = 1
+            var maxPage = Int.MAX_VALUE
+            while (page <= maxPage) {
+                val url = "https://$domain/users-users_fav-page-$page-c-$folderId.html.html"
+                val resp = webClient.httpGet(url, headers)
+                if (resp.code == 401 || resp.code == 403) throw AuthRequiredException(source)
+                if (!resp.isSuccessful) break
+                val doc = resp.parseHtml()
+                if (isLoginPage(doc)) throw AuthRequiredException(source)
+                val items = parseFavoritePage(doc, folderName, folderId)
+                if (items.isEmpty()) break
+                result.addAll(items)
+                val next = doc.select("div.f_left.paginator > a").lastOrNull()?.text()?.toIntOrNull()
+                maxPage = next ?: page
+                page++
+            }
+        }
+        return result
+    }
+
+    override suspend fun addFavorite(manga: Manga): Boolean {
+        val headers = authorizedHeaders().newBuilder()
+            .add("Content-Type", "application/x-www-form-urlencoded")
+            .build()
+        val comicId = extractIdFromUrl(manga.url) ?: extractIdFromUrl(manga.publicUrl)
+            ?: return false
+        val folders = loadFavoriteFolders(headers)
+        val folderId = folders.keys.firstOrNull() ?: createDefaultFolder(headers)
+        val url = "https://$domain/users-save_fav-id-$comicId.html"
+        val resp = webClient.httpPost(url.toHttpUrl(), "favc_id=$folderId", headers)
+        if (resp.code == 401 || resp.code == 403) throw AuthRequiredException(source)
+        if (resp.isSuccessful) return true
+        if (isLoginPage(resp.parseHtml())) throw AuthRequiredException(source)
+        return false
+    }
+
+    override suspend fun removeFavorite(manga: Manga): Boolean {
+        val headers = authorizedHeaders()
+        val comicId = extractIdFromUrl(manga.url) ?: extractIdFromUrl(manga.publicUrl)
+            ?: return false
+        val favoriteId = Regex("fav=(\\d+)").find(manga.url)?.groupValues?.get(1)
+            ?: findFavoriteId(comicId, headers)
+            ?: return false
+        val url = "https://$domain/users-fav_del-id-$favoriteId.html?ajax=true&_t=${Random.nextDouble(0.0, 1.0)}"
+        val resp = webClient.httpGet(url, headers)
+        if (resp.code == 401 || resp.code == 403) throw AuthRequiredException(source)
+        if (resp.isSuccessful) return true
+        val doc = runCatching { resp.parseHtml() }.getOrNull()
+        if (doc != null && isLoginPage(doc)) throw AuthRequiredException(source)
+        return false
+    }
+
+    private fun authorizedHeaders(): Headers {
+        val cookies = context.cookieJar.getCookies(domain)
+        if (cookies.isEmpty()) throw AuthRequiredException(source)
+        return getRequestHeaders().newBuilder()
+            .add("Cookie", cookies.joinToString("; ") { "${it.name}=${it.value}" })
+            .build()
+    }
+
+    private suspend fun loadFavoriteFolders(headers: Headers): Map<String, String> {
+        val url = "https://$domain/users-addfav-id-210814.html"
+        val resp = webClient.httpGet(url, headers)
+        if (resp.code == 401 || resp.code == 403) throw AuthRequiredException(source)
+        if (!resp.isSuccessful) return emptyMap()
+        val doc = resp.parseHtml()
+        if (isLoginPage(doc)) throw AuthRequiredException(source)
+        return doc.select("option[value]").mapNotNull { option ->
+            val id = option.attr("value").trim()
+            val name = option.text().trim()
+            if (id.isEmpty()) null else id to name
+        }.toMap()
+    }
+
+    private suspend fun createDefaultFolder(headers: Headers): String {
+        val url = "https://$domain/users-favc_save-id.html"
+        val resp = webClient.httpPost(
+            url.toHttpUrl(),
+            "favc_name=%E9%BB%98%E8%AE%A4",
+            headers.newBuilder()
+                .add("Content-Type", "application/x-www-form-urlencoded")
+                .build(),
+        )
+        if (resp.code == 401 || resp.code == 403) throw AuthRequiredException(source)
+        // 失败则回退到 0
+        val folders = runCatching { loadFavoriteFolders(headers) }.getOrDefault(emptyMap())
+        return folders.keys.firstOrNull() ?: "0"
+    }
+
+    private fun parseFavoritePage(doc: Document, folderName: String?, folderId: String): List<Manga> {
+        val tag = folderName?.takeIf { it.isNotBlank() }?.let {
+            MangaTag(key = "fav-$folderId", title = it, source = source)
+        }
+        return doc.select("div.asTB").mapNotNull { el ->
+            val link = el.selectFirst("div.box_cel.u_listcon > p.l_title > a") ?: return@mapNotNull null
+            val href = link.attrAsRelativeUrl("href")
+            val id = extractIdFromUrl(href) ?: return@mapNotNull null
+            val detailPath = "/photos-index-page-1-aid-$id.html"
+            val img = el.selectFirst("div.asTBcell.thumb img")
+            var cover = img?.attr("src")
+                ?: img?.attr("data-src")
+            if (!cover.isNullOrBlank() && cover.startsWith("//")) cover = "https:$cover"
+            val title = link.text().trim().ifEmpty { img?.attr("alt").orEmpty() }
+            val favoriteId = el.selectFirst("div.box_cel.u_listcon > p.alopt > a")?.attr("onclick")
+                ?.let { onclick -> Regex("del-id-(\\d+)").find(onclick)?.groupValues?.getOrNull(1) }
+            val tags = if (tag != null) setOf(tag) else emptySet()
+
+            Manga(
+                id = generateUid(detailPath),
+                title = title,
+                altTitles = emptySet(),
+                url = if (favoriteId.isNullOrBlank()) detailPath else "$detailPath?fav=$favoriteId",
+                publicUrl = detailPath.toAbsoluteUrl(domain),
+                rating = RATING_UNKNOWN,
+                contentRating = ContentRating.ADULT,
+                coverUrl = cover,
+                tags = tags,
+                state = null,
+                authors = emptySet(),
+                source = source,
+            )
+        }
+    }
+
+    private fun isLoginPage(doc: Document): Boolean {
+        val hasLoginForm = doc.selectFirst("form[action*=/login], form[action*=user_login], form[action*=?login]") != null
+        val hasLoginInputs = doc.selectFirst("input[name*=user], input[name*=username]") != null &&
+            doc.selectFirst("input[type=password]") != null
+        return hasLoginForm || hasLoginInputs || doc.location().contains("login", true)
+    }
+
+    private suspend fun findFavoriteId(comicId: String, headers: Headers): String? {
+        val folders = loadFavoriteFolders(headers)
+        val folderEntries = if (folders.isEmpty()) listOf("0") else folders.keys.toList()
+        for (folderId in folderEntries) {
+            var page = 1
+            var maxPage = Int.MAX_VALUE
+            while (page <= maxPage) {
+                val url = "https://$domain/users-users_fav-page-$page-c-$folderId.html.html"
+                val resp = webClient.httpGet(url, headers)
+                if (!resp.isSuccessful) break
+                val doc = resp.parseHtml()
+                val fav = doc.select("div.asTB").firstNotNullOfOrNull { el ->
+                    val link = el.selectFirst("div.box_cel.u_listcon > p.l_title > a") ?: return@firstNotNullOfOrNull null
+                    val href = link.attrAsRelativeUrl("href")
+                    val id = extractIdFromUrl(href) ?: return@firstNotNullOfOrNull null
+                    if (id != comicId) return@firstNotNullOfOrNull null
+                    el.selectFirst("div.box_cel.u_listcon > p.alopt > a")?.attr("onclick")
+                        ?.let { onclick -> Regex("del-id-(\\d+)").find(onclick)?.groupValues?.getOrNull(1) }
+                }
+                if (fav != null) return fav
+                val next = doc.select("div.f_left.paginator > a").lastOrNull()?.text()?.toIntOrNull()
+                maxPage = next ?: page
+                page++
+            }
+        }
+        return null
     }
 }

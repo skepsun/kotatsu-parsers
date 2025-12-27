@@ -6,9 +6,12 @@ import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.skepsun.kototoro.parsers.MangaLoaderContext
+import org.skepsun.kototoro.parsers.MangaParserAuthProvider
+import org.skepsun.kototoro.parsers.MangaParserCredentialsAuthProvider
 import org.skepsun.kototoro.parsers.MangaSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedMangaParser
+import org.skepsun.kototoro.parsers.exception.AuthRequiredException
 import org.skepsun.kototoro.parsers.exception.ParseException
 import org.skepsun.kototoro.parsers.model.ContentRating
 import org.skepsun.kototoro.parsers.model.Demographic
@@ -25,6 +28,8 @@ import org.skepsun.kototoro.parsers.model.RATING_UNKNOWN
 import org.skepsun.kototoro.parsers.model.SortOrder
 import org.skepsun.kototoro.parsers.model.YEAR_UNKNOWN
 import org.skepsun.kototoro.parsers.network.UserAgents
+import org.skepsun.kototoro.parsers.FavoritesProvider
+import org.skepsun.kototoro.parsers.FavoritesSyncProvider
 import org.skepsun.kototoro.parsers.util.attrOrThrow
 import org.skepsun.kototoro.parsers.util.generateUid
 import org.skepsun.kototoro.parsers.util.ifNullOrEmpty
@@ -39,12 +44,17 @@ import org.skepsun.kototoro.parsers.util.src
 import org.skepsun.kototoro.parsers.util.suspendlazy.suspendLazy
 import org.skepsun.kototoro.parsers.util.toAbsoluteUrl
 import org.skepsun.kototoro.parsers.util.urlEncoded
+import org.skepsun.kototoro.parsers.util.getCookies
 import java.util.EnumSet
 import java.util.Locale
 
-@MangaSourceParser("MANHUAGUI", "Manhuagui", "zh")
+@MangaSourceParser("MANHUAGUI", "漫画柜", "zh")
 internal class ManhuaguiParser(context: MangaLoaderContext) :
-	PagedMangaParser(context, MangaParserSource.MANHUAGUI, pageSize = 42) {
+	PagedMangaParser(context, MangaParserSource.MANHUAGUI, pageSize = 42),
+	MangaParserAuthProvider,
+	MangaParserCredentialsAuthProvider,
+    FavoritesProvider,
+    FavoritesSyncProvider {
 
 	override val configKeyDomain = ConfigKey.Domain("www.manhuagui.com")
     	override val userAgentKey = ConfigKey.UserAgent(UserAgents.CHROME_DESKTOP)
@@ -451,4 +461,110 @@ internal class ManhuaguiParser(context: MangaLoaderContext) :
 	            .find(working)?.groupValues?.get(1)
 	            ?: throw IllegalArgumentException("JSON payload not found after unpacking."))
 	    }
+
+	override val authUrl: String = "https://www.manhuagui.com/login.html"
+
+	override suspend fun isAuthorized(): Boolean {
+		return context.cookieJar.getCookies("www.manhuagui.com").any { it.name == "my" }
+	}
+
+	override suspend fun getUsername(): String {
+		val cookies = context.cookieJar.getCookies("www.manhuagui.com")
+		val userInfo = cookies.find { it.name == "my" }?.value ?: throw AuthRequiredException(source)
+		// Extract nickname or username from cookie value if possible, otherwise return a placeholder
+		return userInfo.substringAfter("n=").substringBefore("&").ifEmpty { "User" }
+	}
+
+	override suspend fun login(username: String, password: String): Boolean {
+		val url = "https://www.manhuagui.com/tools/submit_ajax.ashx?action=user_login"
+		val body = mapOf(
+			"txtUserName" to username,
+			"txtPassword" to password,
+			"chkb_rem" to "1",
+		)
+
+		val response = try {
+			webClient.httpPost(
+				url.toHttpUrl(),
+				body,
+				extraHeaders = getRequestHeaders().newBuilder()
+					.add("Referer", "https://www.manhuagui.com/login.html")
+					.add("X-Requested-With", "XMLHttpRequest")
+					.build(),
+			)
+		} catch (e: Exception) {
+			return false
+		}
+		return isAuthorized()
+	}
+
+	override suspend fun fetchFavorites(): List<Manga> {
+		if (!isAuthorized()) throw AuthRequiredException(source)
+		val headers = getRequestHeaders().newBuilder()
+			.add("Cookie", context.cookieJar.getCookies(domain).joinToString("; ") { "${it.name}=${it.value}" })
+			.build()
+		val result = mutableListOf<Manga>()
+		var page = 1
+		while (true) {
+			val url = "https://$domain/user/book/shelf/$page"
+			val resp = webClient.httpGet(url, headers)
+			if (resp.code == 401) throw AuthRequiredException(source)
+			if (!resp.isSuccessful) break
+			val doc = resp.parseHtml()
+			val items = doc.select(".dy_content_li")
+			if (items.isEmpty()) break
+			for (el in items) {
+				val a = el.selectFirst(".dy_img a") ?: continue
+				val href = a.attr("href")
+				val id = href.substringAfterLast("/comic/").substringBefore("/")
+				val img = a.selectFirst("img")
+				var cover = img?.attr("src").orEmpty().ifEmpty { img?.attr("data-src").orEmpty() }
+				if (cover.isNotEmpty() && !cover.startsWith("http")) cover = "https:$cover"
+				val title = el.selectFirst(".dy_r h3")?.text().orEmpty()
+				val hrefRel = "/comic/$id/"
+				if (id.isNotEmpty()) {
+					result.add(
+						Manga(
+							id = generateUid(hrefRel),
+							url = hrefRel,
+							publicUrl = "https://$domain$hrefRel",
+							coverUrl = cover,
+							title = title,
+							altTitles = emptySet(),
+							rating = RATING_UNKNOWN,
+							tags = emptySet(),
+							authors = emptySet(),
+							state = null,
+							source = source,
+							contentRating = ContentRating.SAFE,
+						)
+					)
+				}
+			}
+			val next = doc.selectFirst("a.next")
+			if (next == null) break
+			page++
+		}
+		return result
+	}
+
+	override suspend fun addFavorite(manga: Manga): Boolean {
+		if (!isAuthorized()) throw AuthRequiredException(source)
+		val headers = getRequestHeaders().newBuilder()
+			.add("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+			.add("X-Requested-With", "XMLHttpRequest")
+			.add("Cookie", context.cookieJar.getCookies(domain).joinToString("; ") { "${it.name}=${it.value}" })
+			.add("Referer", "https://$domain/comic/${manga.url.substringAfterLast('/')}/")
+			.build()
+		val id = manga.url.substringAfterLast('/').ifEmpty { manga.url }
+		val body = "book_id=$id"
+		val url = "https://$domain/tools/submit_ajax.ashx?action=user_book_shelf_add"
+		val resp = webClient.httpPost(url.toHttpUrl(), body, headers)
+		if (resp.code == 401) throw AuthRequiredException(source)
+		return resp.isSuccessful
+	}
+
+	override suspend fun removeFavorite(manga: Manga): Boolean {
+		throw ParseException("漫画柜暂不支持取消收藏", "https://$domain/")
+	}
 }
