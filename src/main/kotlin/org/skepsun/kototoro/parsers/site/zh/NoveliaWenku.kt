@@ -596,7 +596,6 @@ internal class NoveliaWenku(context: ContentLoaderContext) :
         val mode = config[epubLanguageKey].takeIf { it in EPUB_LANGUAGE_VALUES } ?: EPUB_LANGUAGE_ZH
         val translationsMode = if (config[epubParallelTranslationsKey]) "parallel" else "priority"
         val translations = parseEpubTranslations(config[epubTranslationsKey])
-        val translationsValue = translations.joinToString(",")
         
         // 生成文件名：{mode}.{translationPrefix}{translationCode}.{volumeId}
         // Y = priority (优先), B = parallel (并列)
@@ -608,13 +607,19 @@ internal class NoveliaWenku(context: ContentLoaderContext) :
         val filename = "$mode.$translationPrefix$translationCode.$volumeIdWithEpub"
         
         // 构建完整的下载URL
-        // 注意：服务器不接受URL编码的volumeId，必须使用原始字符
+        // 协议约束（与官网前端 createFileUrl 一致）：
+        // - volumeId 保持原始字符拼接，OkHttp 发请求时会自动 percent-encode（等价于前端的 encodeURIComponent）
+        // - translations 必须作为重复查询参数传递（&translations=sakura&translations=gpt...），
+        //   逗号拼接的单值（translations=sakura,gpt,youdao）会让 Ktor 服务端反序列化失败，
+        //   返回 500 "Can't transform call to resource"
         return buildString {
             append("https://$domain/api/wenku/$novelId/file/$volumeIdWithEpub")
             append("?mode=$mode")
             append("&translationsMode=$translationsMode")
             append("&filename=${filename.urlEncoded()}")
-            append("&translations=${translationsValue.urlEncoded()}")
+            translations.forEach { translation ->
+                append("&translations=${translation.urlEncoded()}")
+            }
         }
     }
 
