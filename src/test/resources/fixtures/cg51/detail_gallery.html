@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"></head>
+<body>
+<div id="post" role="main">
+    <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+        <meta itemprop="url mainEntityOfPage" content="/archives/300001/" />
+        <meta itemprop="image" content="https://img.example.com/cover-300001.jpeg">
+
+        <h1 class="post-title" itemprop="name headline">测试图集帖 合集</h1>
+
+        <div class="post-content" itemprop="articleBody">
+            <!-- 噪音: 顶部广告按钮区 -->
+            <div class="txt-apps">
+                <a class="btn-app tjtagmanager" data-event="ad_click" href="https://ad.example.com/app">推广按钮</a>
+            </div>
+
+            <!-- 正文 -->
+            <p>这是测试图集帖的正文描述，包含人物背景介绍。</p>
+
+            <!-- 图集图片: 懒加载属性携带真实地址, src 为占位图 -->
+            <p><img alt="图1" src="/usr/plugins/tbxw/zw.png?v=2" data-xkrkllgl="https://img.example.com/gallery/001.jpeg"></p>
+            <p><img alt="图2" src="/usr/plugins/tbxw/zw.png?v=2" data-xkrkllgl="https://img.example.com/gallery/002.jpeg"></p>
+            <p><img alt="图3" src="https://img.example.com/gallery/003.jpeg"></p>
+            <!-- 主题资源图: 应被过滤 -->
+            <p><img alt="icon" src="/usr/themes/Mirages/images/some-icon.png"></p>
+            <!-- 广告脚本图: 应被过滤 -->
+            <div class="article-bottom-ads" id="article-bottom-ads-0">
+                <script type="text/javascript">loadImage("https://img.example.com/bottom-ad-1.gif");</script>
+            </div>
+            <!-- 热门推荐区图片: 清洗后不应出现 -->
+            <section class="hot-news-section">
+                <h2 class="section-title">热门推荐</h2>
+                <div class="hot-news-box">
+                    <a href="/archives/999999/"><img src="https://img.example.com/hot-1.jpeg">推荐文章</a>
+                </div>
+            </section>
+
+            <!-- 文章标签 -->
+            <div class="tags">
+                <div itemprop="keywords" class="keywords">
+                    <a href="/tag/heji/">合集</a>
+                    <a href="/tag/tuce/">图册</a>
+                </div>
+            </div>
+
+            <!-- 噪音: 上下篇 -->
+            <div class="post-near">
+                <nav><span class="prev"><a href="/archives/299999/">上一篇</a></span></nav>
+            </div>
+        </div>
+    </article>
+</div>
+</body>
+</html>

@@ -1,11 +1,12 @@
 package org.skepsun.kototoro.parsers.site.zh
 
+import org.json.JSONObject
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import org.skepsun.kototoro.parsers.ContentLoaderContext
 import org.skepsun.kototoro.parsers.ContentSourceParser
 import org.skepsun.kototoro.parsers.config.ConfigKey
 import org.skepsun.kototoro.parsers.core.PagedContentParser
-import org.skepsun.kototoro.parsers.model.ContentRating
-import org.skepsun.kototoro.parsers.model.ContentType
 import org.skepsun.kototoro.parsers.model.Content
 import org.skepsun.kototoro.parsers.model.ContentChapter
 import org.skepsun.kototoro.parsers.model.ContentListFilter
@@ -13,29 +14,36 @@ import org.skepsun.kototoro.parsers.model.ContentListFilterCapabilities
 import org.skepsun.kototoro.parsers.model.ContentListFilterOptions
 import org.skepsun.kototoro.parsers.model.ContentPage
 import org.skepsun.kototoro.parsers.model.ContentParserSource
+import org.skepsun.kototoro.parsers.model.ContentRating
 import org.skepsun.kototoro.parsers.model.ContentTag
 import org.skepsun.kototoro.parsers.model.ContentTagGroup
+import org.skepsun.kototoro.parsers.model.ContentType
 import org.skepsun.kototoro.parsers.model.SortOrder
 import org.skepsun.kototoro.parsers.util.generateUid
 import org.skepsun.kototoro.parsers.util.parseHtml
-import org.json.JSONObject
+import java.util.Base64
 import java.util.EnumSet
-
-import okhttp3.Headers
-import okhttp3.OkHttpClient
-import okhttp3.Response
-
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import java.util.Base64
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import java.io.IOException
+import kotlinx.coroutines.withContext
+import okhttp3.Headers
 
+/**
+ * 51吃瓜 - Mirages Typecho 主题站。
+ *
+ * 站点结构（详情页）：
+ * - 正文容器：#post .post-content[itemprop=articleBody]
+ * - 正文内混有大量非正文块（广告按钮/站址公告/下载APP按钮/上下篇/热门推荐/评论区），
+ *   统一由 [noiseSelector] 移除后再取文本或图片
+ * - 视频：正文内 div.dplayer[data-config]，JSON 中只有 video.url 是主视频；
+ *   video_h265 是同内容的 H.265 编码版（多数播放器不支持），video_player_ads 是贴片广告
+ * - 图片（封面与图集）：AES-128-CBC 加密，密钥/IV 见 [decryptImage]
+ */
 @ContentSourceParser(name = "CG51", title = "51吃瓜", locale = "zh", type = ContentType.HENTAI_VIDEO)
 internal class Cg51(context: ContentLoaderContext) : PagedContentParser(
     context = context,
@@ -56,8 +64,8 @@ internal class Cg51(context: ContentLoaderContext) : PagedContentParser(
         get() = ContentListFilterCapabilities(
             isSearchSupported = true,
             isSearchWithFiltersSupported = true,
-            isMultipleTagsSupported = false, // Selecting multiple categories usually not supported by simple path modification unless using query params, simpler to keep single selection for categories
-            isTagsExclusionSupported = false
+            isMultipleTagsSupported = false,
+            isTagsExclusionSupported = false,
         )
 
     private val categories = listOf(
@@ -81,40 +89,52 @@ internal class Cg51(context: ContentLoaderContext) : PagedContentParser(
         "擦边聊骚" to "dcbq",
         "51涨知识" to "zzs",
         "原创博主" to "yczq",
-        "51剧场" to "51djc"
+        "51剧场" to "51djc",
     )
 
     private val violentKeywords = listOf("血腥", "暴力", "虐待", "杀人", "死亡", "尸体", "袭警", "毒贩", "吸毒", "强奸", "冰毒")
-    
-    private val headers: Headers = Headers.Builder()
-        .add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        .add("Referer", "https://51cg1.com/")
-        .add("Accept", "image/jpeg,image/png,image/webp,*/*;q=0.8")
+
+    override fun getRequestHeaders(): Headers = Headers.Builder()
+        .add("User-Agent", config[userAgentKey])
+        .add("Referer", "https://$domain/")
         .build()
 
-    override fun getRequestHeaders(): Headers = headers
+    /**
+     * 正文容器内的非正文元素：
+     * - .txt-apps / .tjtagmanager / .btn-download / .copy-box / button：广告按钮与分享框
+     * - blockquote：站址公告或跨作品推广
+     * - table：站内导航表格
+     * - .post-near：上一篇/下一篇
+     * - .content-copyright：转载声明
+     * - .tags：标签块（单独解析）
+     * - .hot-news-section / .content-tabs：热门推荐与评论标签页
+     * - .dplayer：播放器（视频地址单独解析）
+     * - .line / script / style：分隔线与脚本样式
+     */
+    private val noiseSelector = ".txt-apps, .tjtagmanager, .btn-download, .copy-box, button, blockquote, table," +
+        " .post-near, .content-copyright, .tags, .hot-news-section, .content-tabs, .dplayer, .line, script, style"
+
+    /** 主题/插件资源路径（占位图、图标等，非内容图片） */
+    private val assetPathPrefixes = listOf("/usr/themes/", "/usr/plugins/")
+
+    /** 懒加载属性优先级：自定义解密属性 > 通用懒加载 > 原始 src */
+    private val lazySrcAttrs = listOf("data-xkrkllgl", "data-src", "data-original")
+
+    private val bannerScriptRegex = Regex("""loadBannerDirect\s*\(\s*['"]([^'"]+)['"]""")
 
     override suspend fun getFilterOptions(): ContentListFilterOptions {
         val tags = categories.map { (name, id) ->
-            ContentTag(
-                key = "category:$id",
-                title = name,
-                source = source
-            )
+            ContentTag(key = "category:$id", title = name, source = source)
         }.toSet()
-        
         return ContentListFilterOptions(
             availableTags = tags,
-            tagGroups = listOf(ContentTagGroup("分类", tags))
+            tagGroups = listOf(ContentTagGroup("分类", tags)),
         )
     }
 
     override suspend fun getListPage(page: Int, order: SortOrder, filter: ContentListFilter): List<Content> {
-        // Handle category selection
-        val selectedCategory = filter.tags.firstOrNull { it.key.startsWith("category:") }?.key?.removePrefix("category:")
-        
-        println("Cg51 Parsing: page=$page, filters=${filter.tags.map { it.key }}, selectedCategory=$selectedCategory")
-
+        val selectedCategory = filter.tags.firstOrNull { it.key.startsWith("category:") }
+            ?.key?.removePrefix("category:")
         val url = when {
             !filter.query.isNullOrEmpty() -> {
                 if (page == 1) "https://$domain/search/${filter.query}"
@@ -126,117 +146,80 @@ internal class Cg51(context: ContentLoaderContext) : PagedContentParser(
             }
             else -> "https://$domain/page/$page/"
         }
-        
-        println("Cg51 Generated URL: $url")
+        val doc = webClient.httpGet(url, getRequestHeaders()).parseHtml()
+        return parseList(doc)
+    }
 
-        val doc = webClient.httpGet(url, headers).parseHtml()
-        // Selectors based on common WordPress/CMS themes often used by these sites
-        val nodes = doc.select("article, .post, .item, .list-item")
-        
-        return coroutineScope {
-            nodes.map { node ->
-                async {
-                    val link = node.selectFirst("a[href]") ?: return@async null
-                    val href = link.attr("href")
-                    // Ensure we have an absolute URL
-                    val absoluteUrl = href.toAbsoluteUrl()
-                    
-                    // Fix Title: remove label tags like "热搜 HOT"
-                    val titleNode = node.selectFirst("h2, h3, .title, .post-title")
-                    titleNode?.select(".wrap, .wraps")?.remove()
-                    
-                    val title = link.attr("title").ifEmpty { 
-                        titleNode?.text()?.trim() ?: link.text().trim()
-                    }
-                    if (title.isEmpty()) return@async null
-                    
-                    // Filter out violent/bloody content
-                    if (violentKeywords.any { title.contains(it, ignoreCase = true) }) {
-                        return@async null
-                    }
-                    
-                    // Extract cover from script (loadBannerDirect) or fallback to img
-                    var cover = Regex("""loadBannerDirect\s*\(\s*['"]([^'"]+)['"]""").find(node.outerHtml())?.groupValues?.get(1)
-                        ?.toAbsoluteUrl()?.replace(Regex("(?<!:)//+"), "/")
-                        ?: node.selectFirst("img")?.let { 
-                            val srcAttr = it.attr("src")
-                            if (srcAttr.startsWith("data:")) return@let srcAttr
-                            
-                            val src = it.attr("data-xkrkllgl").ifEmpty { it.attr("data-src").ifEmpty { it.attr("data-original") } }.ifEmpty { srcAttr }
-                            src.toAbsoluteUrl()
-                        }
-                    
-                    // Decrypt cover if valid URL
-                    if (!cover.isNullOrEmpty() && !cover.startsWith("data:")) {
-                         cover = decryptImage(cover) ?: cover
-                    }
+    /** 列表条目：article 且首个链接指向 /archives/{id}；广告条目（article.ad-item）链接到外部域名，被此规则排除 */
+    internal fun parseList(doc: Document): List<Content> {
+        return doc.select("article").mapNotNull { node ->
+            val link = node.selectFirst("a[href]") ?: return@mapNotNull null
+            val href = link.attr("href")
+            if (!href.contains("/archives/")) return@mapNotNull null
+            val absoluteUrl = href.toAbsoluteUrl()
 
-                    Content(
-                        id = generateUid(absoluteUrl),
-                        title = title,
-                        url = absoluteUrl, // Use absolute URL here to pass checking later
-                        publicUrl = absoluteUrl,
-                        coverUrl = cover,
-                        source = source,
-                        tags = emptySet(),
-                        authors = emptySet(),
-                        altTitles = emptySet(),
-                        rating = 0f,
-                        state = null,
-                        contentRating = ContentRating.ADULT,
-                        largeCoverUrl = null,
-                        description = null,
-                        chapters = null
-                    )
-                }
-            }.awaitAll().filterNotNull()
+            val titleNode = node.selectFirst("h2, h3, .title, .post-title")
+            titleNode?.select(".wrap, .wraps")?.remove()
+            val title = link.attr("title").ifEmpty {
+                titleNode?.text()?.trim() ?: link.text().trim()
+            }
+            if (title.isEmpty()) return@mapNotNull null
+            if (violentKeywords.any { title.contains(it, ignoreCase = true) }) return@mapNotNull null
+
+            val cover = bannerScriptRegex.find(node.outerHtml())?.groupValues?.get(1)?.sanitizeUrl()
+                ?: node.selectFirst("img")?.contentImageSrc()
+            Content(
+                id = generateUid(absoluteUrl),
+                title = title,
+                url = absoluteUrl,
+                publicUrl = absoluteUrl,
+                coverUrl = cover,
+                source = source,
+                tags = emptySet(),
+                authors = emptySet(),
+                altTitles = emptySet(),
+                rating = 0f,
+                state = null,
+                contentRating = ContentRating.ADULT,
+                largeCoverUrl = null,
+                description = null,
+                chapters = null,
+            )
         }
     }
 
     override suspend fun getDetails(manga: Content): Content {
-        // Double check URL validity before requesting
-        val url = manga.url.toAbsoluteUrl()
-        
-        val doc = webClient.httpGet(url, headers).parseHtml()
-        val content = doc.selectFirst(".entry-content, .post-content, article, .content")
-        val desc = content?.text()?.take(500)
-        
-        // Priority 1: List cover (manga.coverUrl)
-        // If we already have a cover from the list (especially if it was decrypted), keep it.
-        // User reports details page often has no cover or worse cover.
-        var cover = manga.coverUrl
-        
-        if (cover.isNullOrBlank()) {
-             // Extract high-res cover from details page only if missing
-            val scriptImgRegex = Regex("""(loadBannerDirect|loadImage)\s*\(\s*["']([^"']+)["']""")
-            val scriptCover = content?.let { 
-                 scriptImgRegex.find(it.outerHtml())?.groupValues?.get(2)
-            }?.toAbsoluteUrl()?.replace(Regex("(?<!:)//+"), "/")
-
-            cover = scriptCover
-                ?: doc.selectFirst("meta[property=og:image]")?.attr("content")?.takeIf { it.isNotBlank() }?.toAbsoluteUrl()?.replace(Regex("(?<!:)//+"), "/")
-                ?: content?.selectFirst("img")?.let { 
-                    val srcAttr = it.attr("src")
-                    if (srcAttr.startsWith("data:")) return@let srcAttr
-                    
-                    val src = it.attr("data-xkrkllgl").ifEmpty { it.attr("data-src").ifEmpty { it.attr("data-original") } }.ifEmpty { srcAttr }
-                    src.toAbsoluteUrl()
-                }
-                
-            // Decrypt details cover if newly extracted
-            if (!cover.isNullOrEmpty() && !cover.startsWith("data:") && !cover.startsWith("file:")) {
-                 cover = decryptImage(cover) ?: cover
-            }
+        val doc = webClient.httpGet(manga.url.toAbsoluteUrl(), getRequestHeaders()).parseHtml()
+        val result = parseDetails(doc, manga)
+        // 列表页已解密的封面直接沿用；详情页新提取的封面需要解密
+        val cover = result.largeCoverUrl
+        if (cover != null && cover != manga.coverUrl && !cover.startsWith("data:") && !cover.startsWith("file:")) {
+            return result.copy(largeCoverUrl = decryptImage(cover) ?: cover)
         }
-        
-        val tags = doc.select("a[rel=tag], .tags a, .tag-cloud a").mapNotNull { 
+        return result
+    }
+
+    internal fun parseDetails(doc: Document, manga: Content): Content {
+        val body = findContentBody(doc)
+        val clean = cleanBody(body)
+
+        // 描述：移除噪音块后的正文文本
+        val desc = clean.text().replace(Regex("\\s+"), " ").trim().take(500).takeIf { it.isNotEmpty() }
+
+        // 封面：列表页封面优先；详情页取 itemprop=image（og:image 是主题默认分享图，不可用），
+        // 再退到清洗后正文的首图（原始正文首图可能是广告图）
+        val cover = manga.coverUrl
+            ?: doc.selectFirst("#post meta[itemprop=image]")?.attr("content")?.takeIf { it.isNotBlank() }?.sanitizeUrl()
+            ?: clean.selectFirst("img")?.contentImageSrc()
+
+        // 标签：仅 #post 内的文章标签块
+        val tags = doc.select("#post .tags a").mapNotNull {
             val name = it.text().trim()
-            if (name.isNotEmpty()) ContentTag(key = name, title = name, source = source) else null 
+            if (name.isNotEmpty()) ContentTag(key = name, title = name, source = source) else null
         }.toSet()
 
-        // Extract videos to determine chapters
+        // 章节：每个视频一个章节；无视频则视为图集
         val videoLinks = extractVideos(doc)
-        
         val chapters = if (videoLinks.isNotEmpty()) {
             videoLinks.mapIndexed { index, link ->
                 ContentChapter(
@@ -244,226 +227,179 @@ internal class Cg51(context: ContentLoaderContext) : PagedContentParser(
                     url = "${manga.url}#video_index=$index",
                     title = "Video ${index + 1}",
                     number = (index + 1).toFloat(),
-                    uploadDate = System.currentTimeMillis(),
+                    uploadDate = 0,
                     volume = 0,
                     branch = null,
                     source = source,
-                    scanlator = null
+                    scanlator = null,
                 )
             }
         } else {
-            // Create a single chapter for images/gallery
             listOf(
                 ContentChapter(
                     id = generateUid(manga.url),
                     url = manga.url,
                     title = "Gallery",
                     number = 1f,
-                    uploadDate = System.currentTimeMillis(),
+                    uploadDate = 0,
                     volume = 0,
                     branch = null,
                     source = source,
-                    scanlator = null
-                )
+                    scanlator = null,
+                ),
             )
         }
 
         return manga.copy(
-            description = desc,
+            description = desc ?: manga.description,
             tags = tags,
             largeCoverUrl = cover,
-            chapters = chapters
+            chapters = chapters,
         )
     }
 
     override suspend fun getPages(chapter: ContentChapter): List<ContentPage> {
         val chapterUrl = chapter.url
         val isVideoChapter = chapterUrl.contains("#video_index=")
-        
-        val actualUrl = if (isVideoChapter) chapterUrl.substringBefore("#") else chapterUrl
-        val doc = webClient.httpGet(actualUrl.toAbsoluteUrl(), headers).parseHtml()
-        
+        val doc = webClient.httpGet(chapterUrl.substringBefore("#").toAbsoluteUrl(), getRequestHeaders()).parseHtml()
+        val videoLinks = extractVideos(doc)
+
         if (isVideoChapter) {
             val index = chapterUrl.substringAfter("#video_index=").toIntOrNull() ?: 0
-            val videoLinks = extractVideos(doc)
-            
-            if (index in videoLinks.indices) {
-                val src = videoLinks[index]
+            val src = videoLinks.getOrNull(index) ?: videoLinks.firstOrNull()
+            if (src != null) {
                 return listOf(
                     ContentPage(
                         id = generateUid(src),
                         url = src,
                         source = source,
-                        preview = null // Preview not easily available here without complex map matching, skipping for chapter mode
-                    )
+                        preview = null,
+                    ),
                 )
             }
         }
-        
-        // Return all videos if not a specific video chapter (fallback)
-        val videoLinks = extractVideos(doc)
-        if (videoLinks.isNotEmpty() && !isVideoChapter) {
-             return videoLinks.map { src ->
-                ContentPage(
-                    id = generateUid(src),
-                    url = src,
-                    source = source,
-                    preview = null
-                )
-            }
-        }
-        
-        // Fallback to Images if no videos found or requested
-        val content = doc.selectFirst(".entry-content, .post-content, article, .content") ?: doc
-        
-        // 1. Images from img tags
-        val imgTags = content.select("img").mapNotNull { img ->
-            val srcAttr = img.attr("src")
-            if (srcAttr.startsWith("data:")) return@mapNotNull srcAttr
-            
-            val src = img.attr("data-xkrkllgl").ifEmpty { img.attr("data-src").ifEmpty { img.attr("data-original") } }.ifEmpty { srcAttr }
-            if (src.isBlank()) return@mapNotNull null
-            // Filter common assets
-            if (src.contains("banner", true) || src.contains("logo", true) 
-                || src.contains("avatar", true) || src.contains("icon", true)) return@mapNotNull null
-            src.toAbsoluteUrl().replace(Regex("(?<!:)//+"), "/")
-        }
 
-        // 2. Images from scripts (loadImage/loadBannerDirect)
-        val scriptImgRegex = Regex("""(loadBannerDirect|loadImage)\s*\(\s*["']([^"']+)["']""")
-        val scriptImages = scriptImgRegex.findAll(content.outerHtml()).map { match ->
-            match.groupValues[2].toAbsoluteUrl().replace(Regex("(?<!:)//+"), "/")
-        }.toList()
+        // 图集：清洗后的正文图片；loadImage/loadBannerDirect 脚本图均为广告或主题资源，不采集
+        val images = parseGalleryImages(findContentBody(doc))
 
-        val allImages = (imgTags + scriptImages).distinct()
-        
-        // Decrypt all images in parallel
         val decryptedImages = coroutineScope {
-            allImages.map { url -> 
-                async { decryptImage(url) ?: url } 
+            images.map { url ->
+                async { decryptImage(url) ?: url }
             }.awaitAll()
         }
-        
+
         return decryptedImages.mapIndexed { index, src ->
             ContentPage(
                 id = generateUid(src),
-                url = src, // This will drastically be longer for Data URIs
+                url = src,
                 source = source,
-                preview = null
+                preview = null,
             )
         }
     }
-    
-    private fun extractVideos(doc: org.jsoup.nodes.Document): List<String> {
-        val videoLinks = mutableListOf<String>()
-        val content = doc.selectFirst(".entry-content, .post-content, article, .content") ?: doc
 
-        // Direct video tags (global search)
-        doc.select("video").forEach { video ->
-            video.attr("src").takeIf { it.isNotBlank() }?.let { 
-                videoLinks.add(it.toAbsoluteUrl())
-            }
-            video.select("source").forEach { source ->
-                source.attr("src").takeIf { it.isNotBlank() }?.let { 
-                    videoLinks.add(it.toAbsoluteUrl())
-                }
-            }
-        }
-        
-        // Iframe extraction (global search)
-        doc.select("iframe").forEach { iframe ->
-             val src = iframe.attr("src")
-             if (src.contains(".mp4") || src.contains(".m3u8")) {
-                 videoLinks.add(src.toAbsoluteUrl())
-             }
-        }
+    private fun findContentBody(doc: Document): Element =
+        doc.selectFirst("#post .post-content[itemprop=articleBody]") ?: doc.selectFirst(".post-content") ?: doc
 
-        // DPlayer extraction - data-config JSON containing video URL
-        doc.select(".dplayer").forEach { player ->
+    /** 克隆正文并移除噪音块（不能在原文档上 remove，会破坏后续解析） */
+    private fun cleanBody(body: Element): Element = body.clone().apply {
+        select(noiseSelector).remove()
+    }
+
+    /** 图集图片：清洗后的正文 img，按懒加载属性取真实地址，过滤主题/插件资源路径 */
+    internal fun parseGalleryImages(body: Element): List<String> = cleanBody(body).select("img").mapNotNull { img ->
+        img.contentImageSrc()?.takeIf { src ->
+            src.startsWith("data:") || assetPathPrefixes.none { src.contains(it) }
+        }
+    }.distinct()
+
+    /**
+     * 视频提取：
+     * 1. div.dplayer[data-config] 的 video.url —— 站点唯一的正片来源。
+     *    同一 JSON 中的 video_h265（H.265 编码版，多数播放器不可播）与
+     *    video_player_ads（贴片广告）不能作为章节，否则出现不可播放的多余视频。
+     * 2. 兜底：#post 内的原生 video/iframe（当前模板未使用，防御性保留）。
+     */
+    private fun extractVideos(doc: Document): List<String> {
+        val videos = LinkedHashSet<String>()
+        val scope = doc.selectFirst("#post") ?: doc
+
+        scope.select(".dplayer").forEach { player ->
             val configJson = player.attr("data-config")
             if (configJson.isNotBlank()) {
-                try {
-                    val config = org.json.JSONObject(configJson)
-                    val video = config.optJSONObject("video")
-                    val url = video?.optString("url", null)
+                runCatching {
+                    val url = JSONObject(configJson).optJSONObject("video")?.optString("url")
                     if (!url.isNullOrBlank()) {
-                        videoLinks.add(url.replace("\\/", "/"))
+                        videos.add(url.replace("\\/", "/"))
                     }
-                } catch (e: Exception) {
-                    // Ignore JSON parse errors
                 }
             }
         }
+        if (videos.isNotEmpty()) return videos.toList()
 
-        // Regex for un-embedded links - Search in full HTML
-        val html = doc.outerHtml()
-        val videoRegex = Regex("""https?:\\?/\\?/[^"'<>\s]+\.(?:mp4|m3u8)[^"'<>\s]*""", RegexOption.IGNORE_CASE)
-        videoRegex.findAll(html).forEach { match ->
-            val cleanUrl = match.value.replace("\\/", "/")
-            videoLinks.add(cleanUrl)
+        scope.select("video").forEach { video ->
+            video.attr("src").takeIf { it.isNotBlank() }?.let { videos.add(it.toAbsoluteUrl()) }
+            video.select("source").forEach { source ->
+                source.attr("src").takeIf { it.isNotBlank() }?.let { videos.add(it.toAbsoluteUrl()) }
+            }
         }
-        
-        return videoLinks.distinct()
+        scope.select("iframe").forEach { iframe ->
+            val src = iframe.attr("src")
+            if (src.contains(".mp4") || src.contains(".m3u8")) {
+                videos.add(src.toAbsoluteUrl())
+            }
+        }
+        return videos.toList()
     }
 
-    private fun String.toAbsoluteUrl(): String {
-        return if (startsWith("data:")) {
-            this
-        } else if (startsWith("//")) {
-            "https:$this"
-        } else if (startsWith("/")) {
-            "https://$domain$this"
-        } else if (startsWith("http")) {
-            this
-        } else if (length > 100 && contains(Regex("[+/=]"))) {
-             // Likely a base64 string, return as is
-             this
-        } else {
-            "https://$domain/$this"
-        }
+    /** 图片懒加载地址：自定义解密属性 > 通用懒加载 > src；data: 直接透传 */
+    private fun Element.contentImageSrc(): String? {
+        val src = attr("src")
+        if (src.startsWith("data:")) return src
+        return lazySrcAttrs.firstNotNullOfOrNull { attr(it).takeIf { v -> v.isNotBlank() } }
+            ?: src.takeIf { it.isNotBlank() }
     }
 
+    private fun String.sanitizeUrl(): String = toAbsoluteUrl().replace(Regex("(?<!:)//+"), "/")
+
+    private fun String.toAbsoluteUrl(): String = when {
+        startsWith("data:") -> this
+        startsWith("//") -> "https:$this"
+        startsWith("/") -> "https://$domain$this"
+        startsWith("http") -> this
+        else -> "https://$domain/$this"
+    }
+
+    /**
+     * 图片为 AES-128-CBC 加密的字节流，解密后写入临时文件返回 file:// URI
+     * （避免大体积 Base64 data URI 触发 TransactionTooLargeException）。
+     */
     private suspend fun decryptImage(url: String?): String? {
         if (url.isNullOrEmpty()) return null
-        // If already data URI, return as is
         if (url.startsWith("data:")) return url
-        
-        println("Cg51: decryptImage called for $url")
-        
         return withContext(Dispatchers.IO) {
             try {
-                val isBase64 = !url.startsWith("http") && url.length > 32
-                
-                // Fetch or parse the encrypted binary
-                val bytes = if (isBase64) {
+                val bytes = if (!url.startsWith("http") && url.length > 32) {
+                    // 站点有时直接内联 Base64 密文
                     try {
                         Base64.getDecoder().decode(url)
                     } catch (e: Exception) {
                         return@withContext url
                     }
                 } else {
-                    val response = webClient.httpGet(url, headers)
-                    response.body?.bytes() ?: return@withContext null
+                    webClient.httpGet(url, getRequestHeaders()).body?.bytes() ?: return@withContext null
                 }
-                
-                // Decrypt
+
                 val key = SecretKeySpec("f5d965df75336270".toByteArray(), "AES")
                 val iv = IvParameterSpec("97b60394abc2fbe1".toByteArray())
                 val cipher = Cipher.getInstance("AES/CBC/PKCS7Padding")
                 cipher.init(Cipher.DECRYPT_MODE, key, iv)
-                
-                val decrypted = cipher.doFinal(bytes)
-                
-                // Save to temp file to avoid TransactionTooLargeException with large Base64 strings
+
                 val tempFile = java.io.File.createTempFile("cg51_", ".jpg")
-                tempFile.writeBytes(decrypted)
-                
-                println("Cg51: Decrypted to file: ${tempFile.absolutePath}")
-                
+                tempFile.writeBytes(cipher.doFinal(bytes))
                 "file://${tempFile.absolutePath}"
             } catch (e: Exception) {
-                e.printStackTrace()
-                // Fallback to original URL if decryption fails
+                // 解密失败（未加密的图或网络错误）回退原地址
                 url
             }
         }

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>51吃瓜 - 测试夹具</title></head>
+<body>
+<div class="main-container">
+    <!-- 广告条目: article.ad-item, 链接到外部域名, 不应出现在列表中 -->
+    <article class="ad-item">
+        <a href="https://ad.example1.com" target="_blank" title="广告1">
+            <img src="/usr/themes/Mirages/images/ad-placeholder.png" alt="广告">
+        </a>
+    </article>
+    <!-- 真实文章: article + /archives/ 链接 -->
+    <article itemscope itemtype="http://schema.org/BlogPosting" class="">
+        <meta itemprop="url mainEntityOfPage" content="/archives/100001/" />
+        <a href="/archives/100001/">
+            <div class="post-card" id="post-card-100001">
+                <script type="text/javascript">
+                    loadBannerDirect('https://img.example.com/cover-100001.jpeg',
+                        '',
+                        document.querySelector('#post-card-100001'),
+                        '-1', 0, 0);
+                </script>
+                <div class="post-card-mask">
+                    <div class="post-card-container">
+                        <h2 class="post-card-title" itemprop="headline">
+                            测试标题甲 第一集
+                            <div class="wrap"><span class="wraps">热搜 HOT</span></div>
+                        </h2>
+                        <div class="post-card-info">
+                            <span>测试作者 • </span>
+                            <span>2026 年 09 月 09 日 • </span>
+                            <span>今日吃瓜, 51剧场</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </article>
+    <!-- 真实文章: 无 loadBannerDirect, 封面走 img 懒加载属性 -->
+    <article itemscope itemtype="http://schema.org/BlogPosting" class="">
+        <meta itemprop="url mainEntityOfPage" content="/archives/100002/" />
+        <a href="/archives/100002/" title="测试标题乙 第二集">
+            <div class="post-card" id="post-card-100002">
+                <div class="post-card-mask">
+                    <div class="post-card-container">
+                        <h2 class="post-card-title" itemprop="headline">测试标题乙 第二集</h2>
+                        <img src="/usr/plugins/tbxw/zw.png?v=2" data-xkrkllgl="https://img.example.com/cover-100002.jpeg">
+                    </div>
+                </div>
+            </div>
+        </a>
+    </article>
+    <!-- 暴力关键词文章: 应被过滤 -->
+    <article itemscope itemtype="http://schema.org/BlogPosting" class="">
+        <a href="/archives/100003/" title="测试标题 血腥暴力内容">
+            <div class="post-card"><div class="post-card-mask"><h2 class="post-card-title">测试标题 血腥暴力内容</h2></div></div>
+        </a>
+    </article>
+    <!-- 又一个广告条目 -->
+    <article class="ad-item">
+        <a href="https://ad.example2.cc:51212/9e4e.html" target="_blank">
+            <div class="post-card"><div class="post-card-mask"><h2 class="post-card-title">点击领取</h2></div></div>
+        </a>
+    </article>
+</div>
+</body>
+</html>
