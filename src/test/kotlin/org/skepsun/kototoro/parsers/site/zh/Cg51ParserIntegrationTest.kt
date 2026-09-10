@@ -37,6 +37,23 @@ class Cg51ParserIntegrationTest {
             assertTrue(it.url.contains("/archives/"), "列表混入非文章链接: ${it.url}")
         }
 
+        // 1a. 封面: 站点图片为 AES 加密字节流, 必须解密为本地临时文件(file://)才能显示
+        val withCover = list.filter { it.coverUrl != null }
+        assertTrue(withCover.isNotEmpty(), "列表无任何封面")
+        withCover.take(3).forEach {
+            val coverUrl = it.coverUrl!!
+            assertTrue(
+                coverUrl.startsWith("file://") || coverUrl.startsWith("data:"),
+                "封面未解密(仍是远程加密 URL): $coverUrl",
+            )
+            if (coverUrl.startsWith("file://")) {
+                val bytes = java.io.File(coverUrl.removePrefix("file://")).readBytes()
+                assertTrue(bytes.size > 1000, "封面文件过小: ${bytes.size}")
+                assertEquals(0xFF, bytes[0].toInt() and 0xFF, "JPEG 魔数不符(解密失败): $coverUrl")
+                assertEquals(0xD8, bytes[1].toInt() and 0xFF, "JPEG 魔数不符(解密失败): $coverUrl")
+            }
+        }
+
         // 2. 详情: 描述不包含常见噪音词; 章节为视频或图集
         val detail = parser.getDetails(list.first())
         val desc = detail.description.orEmpty()

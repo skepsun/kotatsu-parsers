@@ -147,7 +147,19 @@ internal class Cg51(context: ContentLoaderContext) : PagedContentParser(
             else -> "https://$domain/page/$page/"
         }
         val doc = webClient.httpGet(url, getRequestHeaders()).parseHtml()
-        return parseList(doc)
+        // 封面是 AES 加密字节流（与图集图片同密钥），解密为临时文件后才能显示
+        return coroutineScope {
+            parseList(doc).map { item ->
+                async {
+                    val cover = item.coverUrl
+                    if (cover != null && !cover.startsWith("data:") && !cover.startsWith("file:")) {
+                        item.copy(coverUrl = decryptImage(cover) ?: cover)
+                    } else {
+                        item
+                    }
+                }
+            }.awaitAll()
+        }
     }
 
     /** 列表条目：article 且首个链接指向 /archives/{id}；广告条目（article.ad-item）链接到外部域名，被此规则排除 */
@@ -392,7 +404,8 @@ internal class Cg51(context: ContentLoaderContext) : PagedContentParser(
 
                 val key = SecretKeySpec("f5d965df75336270".toByteArray(), "AES")
                 val iv = IvParameterSpec("97b60394abc2fbe1".toByteArray())
-                val cipher = Cipher.getInstance("AES/CBC/PKCS7Padding")
+                // PKCS5 与 PKCS7 对 AES 是同一填充算法; 用 PKCS5 保证桌面 JVM(测试)与 Android 都可用
+                val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
                 cipher.init(Cipher.DECRYPT_MODE, key, iv)
 
                 val tempFile = java.io.File.createTempFile("cg51_", ".jpg")
